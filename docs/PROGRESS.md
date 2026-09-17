@@ -24,15 +24,20 @@ cd frontend && cmd /c "npm install" && cmd /c "npm run dev"
 
 # 测试
 mvn -f backend/pom.xml test                                # 单元测试（集成测试默认排除，可离线重复）
-mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含真机克隆集成测试，需网络
+mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 6 个真机集成测试（克隆 2 + 扫描 2 + 分析 2），需网络，约 40s
 
 # 前端构建（含类型检查）
 cd frontend && cmd /c "npm run build"
 ```
 冒烟结果（多次运行一致）：后端启动约 1.7s，全程无 WARN/ERROR；`:8080/health` 与经 Vite 代理的
-`:5173/health` 均 200，且两者时间戳相差约 100ms（证明请求真的穿透了代理，不是缓存）；
-首页 200。启动无绑定异常，说明 `codecompass.scan` 与 `codecompass.clone` 下的
-`60s`、字节阈值、源码根均正确解析。
+`:5173/health` 均 200，且两者时间戳相差约 100ms（证明请求真的穿透了代理，不是缓存）；首页 200。
+启动无绑定异常，说明 `codecompass.scan` / `codecompass.clone` / `codecompass.analyze`
+三处配置均正确解析 —— 包括 framework-markers 里那些带引号的 `@` 标记（YAML 中 `@` 是保留指示符，
+不加引号会解析失败）。
+
+> **启动成功不能证明什么**：它证明不了 `JavaSpringAnalyzer` 已被注册表发现 —— 若装配类没被
+> 组件扫描到，`ObjectProvider` 给出空列表，注册表为空，应用照样正常启动、`/health` 照样 200。
+> 这一条由集成测试的 `registry.forLanguage("java").orElseThrow(...)` 覆盖。
 
 ## 阻塞项
 （空）
