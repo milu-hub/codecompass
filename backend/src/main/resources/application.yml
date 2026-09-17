@@ -36,8 +36,32 @@ codecompass:
         - '@Repository'
         - '@Component'
         - '@Configuration'
-        - '@Bean'
         - '@Autowired'
+        - '@Bean'
+
+    # 核心注解 → 角色。这是 T5「注解列表可配置」的实质载体。
+    # 与 framework-markers 语义不同，刻意分开：前者回答「仓库是不是 Spring」，
+    # 这里回答「这个类扮演什么角色」。启动时会校验两者的一致性并在漂移时告警。
+    #
+    # 角色按声明顺序取第一个命中者，因此决定性的角色（entry）写在前面。
+    # 名为 member 的角色是保留字：声明成员级（字段/方法）注解，不参与类级角色判定。
+    core-annotations:
+      spring:
+        entry:
+          - '@SpringBootApplication'
+        controller:
+          - '@Controller'
+          - '@RestController'
+        service:
+          - '@Service'
+        repository:
+          - '@Repository'
+        component:
+          - '@Component'
+          - '@Configuration'
+        member:
+          - '@Autowired'
+          - '@Bean'
 
   clone:
     # git 可执行文件。默认 "git"，依赖 PATH。

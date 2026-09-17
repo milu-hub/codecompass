@@ -22,6 +22,17 @@ public class JavaAnalyzeProperties {
     /** 框架名 → 识别标记。例如 spring → [@SpringBootApplication, @RestController, ...] */
     private Map<String, List<String>> frameworkMarkers = new LinkedHashMap<>();
 
+    /**
+     * 框架名 → 角色 → 核心注解。这是 T5「注解列表可配置」的实质载体。
+     *
+     * <p>与 {@link #frameworkMarkers} 语义不同，刻意分开：前者回答「这个仓库是不是 Spring」，
+     * 后者回答「这个类扮演什么角色」。硬合并会让两件事互相绑架。
+     *
+     * <p>注解写法宽容：{@code @Controller} / {@code Controller} / {@code @org.x.Controller}
+     * 都会被规范化成 {@code @Controller}（与 SCHEMA.md 的写法一致）。
+     */
+    private Map<String, Map<String, List<String>>> coreAnnotations = new LinkedHashMap<>();
+
     public JavaSettings getJava() {
         return java;
     }
@@ -36,6 +47,14 @@ public class JavaAnalyzeProperties {
 
     public void setFrameworkMarkers(Map<String, List<String>> frameworkMarkers) {
         this.frameworkMarkers = frameworkMarkers;
+    }
+
+    public Map<String, Map<String, List<String>>> getCoreAnnotations() {
+        return coreAnnotations;
+    }
+
+    public void setCoreAnnotations(Map<String, Map<String, List<String>>> coreAnnotations) {
+        this.coreAnnotations = coreAnnotations;
     }
 
     public static class JavaSettings {

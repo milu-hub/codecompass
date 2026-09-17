@@ -1,0 +1,99 @@
+# 黄金样本人工标注：spring-petclinic/spring-petclinic-microservices
+#
+# 地面真值的取得方式同 petclinic：独立脚本直接解析原始源码的注解行，不经过本项目解析器。
+# 覆盖率口径（TASKBOOK §04）：分母 = coreAnnotatedClasses 的数量。
+
+repository: https://github.com/spring-petclinic/spring-petclinic-microservices
+language: java
+framework: spring
+scannedJavaFiles: 53
+
+# TASKBOOK §03 要求：入口类（每个模块一个，共 8 个模块）
+entryClasses:
+  - org.springframework.samples.petclinic.admin.SpringBootAdminApplication
+  - org.springframework.samples.petclinic.api.ApiGatewayApplication
+  - org.springframework.samples.petclinic.config.ConfigServerApplication
+  - org.springframework.samples.petclinic.customers.CustomersServiceApplication
+  - org.springframework.samples.petclinic.discovery.DiscoveryServerApplication
+  - org.springframework.samples.petclinic.genai.GenAIServiceApplication
+  - org.springframework.samples.petclinic.vets.VetsServiceApplication
+  - org.springframework.samples.petclinic.visits.VisitsServiceApplication
+
+# 覆盖率的分母：带核心注解的类（共 25 个）
+coreAnnotatedClasses:
+  - name: org.springframework.samples.petclinic.admin.SpringBootAdminApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.api.ApiGatewayApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.api.application.CustomersServiceClient
+    annotation: '@Component'
+  - name: org.springframework.samples.petclinic.api.application.VisitsServiceClient
+    annotation: '@Component'
+  - name: org.springframework.samples.petclinic.api.boundary.web.ApiGatewayController
+    annotation: '@RestController'
+  - name: org.springframework.samples.petclinic.api.boundary.web.FallbackController
+    annotation: '@RestController'
+  - name: org.springframework.samples.petclinic.config.ConfigServerApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.customers.CustomersServiceApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.customers.config.MetricConfig
+    annotation: '@Configuration'
+  - name: org.springframework.samples.petclinic.customers.web.OwnerResource
+    annotation: '@RestController'
+  - name: org.springframework.samples.petclinic.customers.web.PetResource
+    annotation: '@RestController'
+  - name: org.springframework.samples.petclinic.customers.web.mapper.OwnerEntityMapper
+    annotation: '@Component'
+  - name: org.springframework.samples.petclinic.discovery.DiscoveryServerApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.genai.AIBeanConfiguration
+    annotation: '@Configuration'
+  - name: org.springframework.samples.petclinic.genai.AIDataProvider
+    annotation: '@Service'
+  - name: org.springframework.samples.petclinic.genai.GenAIServiceApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.genai.PetclinicChatClient
+    annotation: '@RestController'
+  - name: org.springframework.samples.petclinic.genai.PetclinicTools
+    annotation: '@Component'
+  # ⚠️ 类名叫 VectorStoreController，但注解是 @Component 而非 @RestController。
+  # 这是"只信注解不信类名"的活证据 —— 任何按名字猜角色的启发式都会在这里判错。
+  - name: org.springframework.samples.petclinic.genai.VectorStoreController
+    annotation: '@Component'
+  - name: org.springframework.samples.petclinic.vets.VetsServiceApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.vets.system.CacheConfig
+    annotation: '@Configuration'
+  - name: org.springframework.samples.petclinic.vets.web.VetResource
+    annotation: '@RestController'
+  - name: org.springframework.samples.petclinic.visits.VisitsServiceApplication
+    annotation: '@SpringBootApplication'
+  # ⚠️ 与 customers 模块的 MetricConfig 同名不同包，是真实的"同名类"用例
+  - name: org.springframework.samples.petclinic.visits.config.MetricConfig
+    annotation: '@Configuration'
+  - name: org.springframework.samples.petclinic.visits.web.VisitResource
+    annotation: '@RestController'
+
+# TASKBOOK §03 要求：核心依赖关系（跨服务调用通过 Feign 客户端，边由字段类型产生）
+coreDependencies:
+  - from: org.springframework.samples.petclinic.api.boundary.web.ApiGatewayController
+    to: org.springframework.samples.petclinic.api.application.CustomersServiceClient
+  - from: org.springframework.samples.petclinic.api.boundary.web.ApiGatewayController
+    to: org.springframework.samples.petclinic.api.application.VisitsServiceClient
+  - from: org.springframework.samples.petclinic.customers.web.OwnerResource
+    to: org.springframework.samples.petclinic.customers.web.mapper.OwnerEntityMapper
+
+# TASKBOOK §03 要求：任选 5 个类的功能描述
+# ⚠️ 以下描述由 AI 依源码草拟，**尚待人工确认**。
+classDescriptions:
+  - name: org.springframework.samples.petclinic.api.ApiGatewayApplication
+    description: API 网关模块的 Spring Boot 入口，启用服务发现，对外暴露统一入口并把请求路由到各微服务。
+  - name: org.springframework.samples.petclinic.api.boundary.web.ApiGatewayController
+    description: 网关的 REST 控制器（@RestController）。聚合 customers 与 visits 两个下游服务的数据，通过 Feign 客户端调用后组装成前端需要的视图对象。
+  - name: org.springframework.samples.petclinic.api.application.CustomersServiceClient
+    description: 调用 customers-service 的 Feign 客户端（@Component），声明式地定义远程调用接口。
+  - name: org.springframework.samples.petclinic.genai.AIDataProvider
+    description: GenAI 模块的数据提供者（@Service），为对话式查询准备宠物诊所的业务数据。
+  - name: org.springframework.samples.petclinic.genai.VectorStoreController
+    description: 向量库相关能力的控制器。类名带 Controller，但实际标注的是 @Component —— 判定角色必须依据注解。

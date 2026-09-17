@@ -20,4 +20,9 @@ public class JavaAnalyzerConfiguration {
     public JavaSpringAnalyzer javaSpringAnalyzer(JavaAnalyzeProperties properties) {
         return new JavaSpringAnalyzer(properties);
     }
+
+    @Bean
+    public CoreAnnotationClassifier coreAnnotationClassifier(JavaAnalyzeProperties properties) {
+        return new CoreAnnotationClassifier(properties);
+    }
 }

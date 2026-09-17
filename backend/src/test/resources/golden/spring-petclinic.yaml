@@ -1,0 +1,63 @@
+# 黄金样本人工标注：spring-projects/spring-petclinic
+#
+# 地面真值的取得方式：用独立脚本直接解析原始源码的注解行，**不经过本项目解析器**。
+# 这一点是刻意的 —— 若拿被测代码的输出当标准答案，覆盖率恒为 100%，指标就失去意义。
+#
+# 覆盖率口径（TASKBOOK §04）：分母 = coreAnnotatedClasses 的数量。
+# 分母只取「带核心注解的类」，因此不带注解的类（如 OwnerRepository 这类 Spring Data 接口）
+# 不进分母 —— 它们没有注解，识别不出来不是解析器的缺陷。
+
+repository: https://github.com/spring-projects/spring-petclinic
+language: java
+framework: spring
+scannedJavaFiles: 30
+
+# TASKBOOK §03 要求：入口类
+entryClasses:
+  - org.springframework.samples.petclinic.PetClinicApplication
+
+# 覆盖率的分母：带核心注解的类（共 10 个）
+coreAnnotatedClasses:
+  - name: org.springframework.samples.petclinic.PetClinicApplication
+    annotation: '@SpringBootApplication'
+  - name: org.springframework.samples.petclinic.owner.OwnerController
+    annotation: '@Controller'
+  - name: org.springframework.samples.petclinic.owner.PetController
+    annotation: '@Controller'
+  - name: org.springframework.samples.petclinic.owner.PetTypeFormatter
+    annotation: '@Component'
+  - name: org.springframework.samples.petclinic.owner.VisitController
+    annotation: '@Controller'
+  - name: org.springframework.samples.petclinic.system.CacheConfiguration
+    annotation: '@Configuration'
+  - name: org.springframework.samples.petclinic.system.CrashController
+    annotation: '@Controller'
+  - name: org.springframework.samples.petclinic.system.WebConfiguration
+    annotation: '@Configuration'
+  - name: org.springframework.samples.petclinic.system.WelcomeController
+    annotation: '@Controller'
+  - name: org.springframework.samples.petclinic.vet.VetController
+    annotation: '@Controller'
+
+# TASKBOOK §03 要求：核心依赖关系
+coreDependencies:
+  - from: org.springframework.samples.petclinic.owner.OwnerController
+    to: org.springframework.samples.petclinic.owner.OwnerRepository
+  - from: org.springframework.samples.petclinic.owner.VisitController
+    to: org.springframework.samples.petclinic.owner.OwnerRepository
+  - from: org.springframework.samples.petclinic.vet.VetController
+    to: org.springframework.samples.petclinic.vet.VetRepository
+
+# TASKBOOK §03 要求：任选 5 个类的功能描述
+# ⚠️ 以下描述由 AI 依源码草拟，**尚待人工确认** —— TASKBOOK 要求的是"手工标注"。
+classDescriptions:
+  - name: org.springframework.samples.petclinic.PetClinicApplication
+    description: Spring Boot 应用入口，标注 @SpringBootApplication，main 方法启动整个 PetClinic 应用。
+  - name: org.springframework.samples.petclinic.owner.OwnerController
+    description: 宠物主人的 Web 控制器（@Controller）。处理主人查询、分页列表、详情、新增与编辑表单的 GET/POST 请求，使用 ModelAndView 渲染 Thymeleaf 视图，并通过构造器注入 OwnerRepository 访问数据。
+  - name: org.springframework.samples.petclinic.owner.OwnerRepository
+    description: 主人数据的仓储接口，继承 JpaRepository<Owner, Integer>，由 Spring Data JPA 在运行期生成实现。注意它**不带任何注解** —— 这正是 @Repository 在本样本中出现 0 次的原因。
+  - name: org.springframework.samples.petclinic.owner.PetTypeFormatter
+    description: 宠物类型的表单格式化器（@Component），实现 Spring 的 Formatter<PetType>，负责在页面下拉框的字符串与 PetType 实体之间双向转换，构造器注入 PetTypeRepository。
+  - name: org.springframework.samples.petclinic.vet.VetController
+    description: 兽医列表的 Web 控制器（@Controller）。提供 /vets.html 分页查询接口，另有一个以 @ResponseBody 返回数据的端点，供前端分页组件使用。

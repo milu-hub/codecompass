@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T5 Spring 注解识别
+T6 依赖图构建（Mermaid 渲染数据）
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 120 + 集成 6 = 126，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 136 + 集成 12 = 148，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -12,6 +12,7 @@ T5 Spring 注解识别
 - T2 源码文件扫描器：按 `scan.sources[]` 配置扫描、源码根片段匹配推导包名、多模块、排除 package-info/module-info。新增单元 15 + 集成 2（真机扫描 petclinic、真机扫描 8 模块 microservices）
 - T3 LanguageAnalyzer 接口 + 语言中立 DTO：`LanguageAnalyzer`、`LanguageAnalyzerRegistry`、`AnalyzeRequest`、`AnalyzeResult`、`CodeUnitInfo`、`MethodInfo`、`FieldInfo`、`DependencyEdge`、`FailedFile`、`ModelSupport`、`AnalyzerConfiguration`。新增单元 20。**未写任何分析器实现**
 - T4 JavaSpringAnalyzer：JavaParser 3.28.2 语法级解析、两遍处理（解析 + 引用解析成边）、框架识别、失败隔离。新增单元 34 + 集成 2（两黄金样本贯通 T1→T4 全链路）
+- T5 Spring 注解识别：`CoreAnnotationClassifier`（配置驱动，零注解字面量）、核心注解角色配置、**黄金样本人工标注**（`src/test/resources/golden/*.yaml`，地面真值独立取得）、覆盖率验收。新增单元 16 + 集成 6（覆盖率/入口类/核心依赖 × 2 样本）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -24,7 +25,7 @@ cd frontend && cmd /c "npm install" && cmd /c "npm run dev"
 
 # 测试
 mvn -f backend/pom.xml test                                # 单元测试（集成测试默认排除，可离线重复）
-mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 6 个真机集成测试（克隆 2 + 扫描 2 + 分析 2），需网络，约 40s
+mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 12 个真机集成测试（克隆 2 + 扫描 2 + 分析 2 + 覆盖率 6），需网络，约 90s
 
 # 前端构建（含类型检查）
 cd frontend && cmd /c "npm run build"
@@ -94,3 +95,13 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：**行号语义 —— JavaParser 把注解算进类型声明范围**，故 `startLine` 指向注解行而非 `class` 关键字行。这对 T10 引用展示是好事（能带出注解上下文），已在集成测试中显式断言该语义
 - 2026-09-17：**JavaParser 类型只出现在 `analyzer/java/` 内** —— 已扫描验证：24 处 javaparser import 全部在该包，`analyzer/` 根包与 `web`/`repo` 包零命中（根包内 2 处命中均为「刻意不用」的 Javadoc 说明）。`LanguageAnalyzer` 生产实现**恰好 1 个**
 - 2026-09-17：T6 范围据此收窄为「图结构整理 + Mermaid 渲染数据」，名字解析与去重已在 T4 完成（已写入 TASKS.md）
+- 2026-09-17：**T5 的要求 1、2 在 T4 已实现**（提取全部注解 ⊇ 那 8 个；注解列表已可配置）。T5 真正新增的是：核心注解的**角色配置**、`CoreAnnotationClassifier`、**黄金样本人工标注**、**覆盖率度量**
+- 2026-09-17：**覆盖率分母按「注解」而非「语义」**（取 TASKBOOK §04 的字面口径）。若按 §03 的语义口径，`OwnerRepository`（Spring Data 接口、不带注解）要进分母，就得识别"继承自 `Repository`/`JpaRepository`"，那已不是注解识别、且需引入仓外框架知识
+- 2026-09-17：**实测 —— 8 个核心注解里有 2 个在两个黄金样本上出现 0 次**：`@Autowired` 恒为 0（两样本都用构造器注入，Spring 4.3 起单构造器可省略注解）、`@Repository` 恒为 0（仓储是 Spring Data 接口）。故覆盖率分母只取**实测存在**的类级核心注解，`@Autowired`/`@Bean` 改用**合成用例**验证
+- 2026-09-17：**`@Autowired` / `@Bean` 是成员级注解**，永远不会出现在 `CodeUnitInfo.annotations` 里 —— `@Autowired` 在字段、`@Bean` 在方法。分类器为此提供 `memberLevelCoreAnnotations`，约定 `member` 为保留角色名
+- 2026-09-17：**`@Configuration` 归入 component 角色**（TASKBOOK 那 8 个里没有它，但实测两样本共有 6 个纯 `@Configuration` 类，不认会漏掉配置类）。`CoreAnnotationClassifierTest` 有一条用例专门钉住"component 是 2 不是 1"
+- 2026-09-17：**角色判定只信注解不信类名** —— 实测 microservices 的 `VectorStoreController` 带的是 `@Component` 而非 `@RestController`，任何按名字猜角色的启发式都会误判。同名不同包的 `MetricConfig`（customers / visits）是另一条真实用例
+- 2026-09-17：**覆盖率的地面真值必须独立于被测代码取得**，否则用解析器输出誊一份标注，覆盖率恒为 100%、指标失效。本次用独立脚本直接解析原始源码的注解行生成，落成 `golden/*.yaml` 后固定
+- 2026-09-17：`core-annotations` 与 `framework-markers` **语义不同故分开配置**（前者答"这个类是什么角色"，后者答"仓库是不是 Spring"），但启动时校验一致性并 WARN，把漂移显式暴露而不是硬合并（硬合并会让两件事互相绑架）
+- 2026-09-17：T5 覆盖率实测 **100%**（petclinic 分母 10、microservices 分母 25，全部命中），超出 TASKBOOK 要求的 80%
+- 2026-09-17：**黄金样本的"5 个类的功能描述"由 AI 依源码草拟、尚待人工确认** —— TASKBOOK §03 要求的是手工标注，这部分无法代笔
