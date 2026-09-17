@@ -4,10 +4,12 @@
 T3 LanguageAnalyzer 接口定义
 
 ## 已完成
-- T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 66 + 集成 4 = 70，全绿**。
+
+- T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
-- T1 GitHub 仓库浅克隆服务：URL 校验、稀疏浅克隆（4 条 git 命令）、落盘看门狗、三项终检、安全删除。单元测试 50 个 + 集成测试 2 个（真机克隆 spring-petclinic）
-- T2 源码文件扫描器：按 `scan.sources[]` 配置扫描、源码根片段匹配推导包名、多模块、排除 package-info/module-info。单元测试 15 个 + 集成测试 1 个（真机 petclinic，文件数与磁盘实际一致）
+- T1 GitHub 仓库浅克隆服务：URL 校验、稀疏浅克隆（4 条 git 命令）、落盘看门狗、三项终检、安全删除。新增单元 41 + 集成 2（真机克隆 spring-petclinic、失败路径）
+- T2 源码文件扫描器：按 `scan.sources[]` 配置扫描、源码根片段匹配推导包名、多模块、排除 package-info/module-info。新增单元 15 + 集成 2（真机扫描 petclinic、真机扫描 8 模块 microservices）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -25,8 +27,10 @@ mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含真机克隆集�
 # 前端构建（含类型检查）
 cd frontend && cmd /c "npm run build"
 ```
-冒烟结果：后端启动 1.671s 无 WARN/ERROR；`:8080/health` 与经 Vite 代理的 `:5173/health` 均 200；
-首页 200。启动无绑定异常，说明 `codecompass.clone` 下的 `60s` 与字节阈值均正确解析。
+冒烟结果（多次运行一致）：后端启动约 1.7s，全程无 WARN/ERROR；`:8080/health` 与经 Vite 代理的
+`:5173/health` 均 200，且两者时间戳相差约 100ms（证明请求真的穿透了代理，不是缓存）；
+首页 200。启动无绑定异常，说明 `codecompass.scan` 与 `codecompass.clone` 下的
+`60s`、字节阈值、源码根均正确解析。
 
 ## 阻塞项
 （空）
@@ -60,3 +64,4 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：`CodeUnitFileInfo.packageName` 在默认包时取 `""` 而非 null；结果按 `relativePath` 排序保证确定性；多模块同名类**不按 unitName 去重**
 - 2026-09-17：**多模块黄金样本定为 `spring-petclinic/spring-petclinic-microservices`**（8 模块，无根级源码，53 个 .java）。与 petclinic 互补：后者单模块、源码在根级，专门照出 glob 方言的零层前缀坑；前者全是带模块名前缀的路径。两者均已进集成测试
 - 2026-09-17：实测该样本克隆+检出 8.4s，落盘 62 文件 / 0.13 MB / 最大单文件 10.5 KB，远在 1000 文件、20MB 单文件、500MB 总大小三项上限之内
+- 2026-09-17：**TASKBOOK §03 的第三个黄金样本（「一个你熟悉的项目」）仍待用户选定** —— 它用于人工判断解析结果是否合理，无法代选。T12 端到端验收会用到
