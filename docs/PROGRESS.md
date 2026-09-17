@@ -1,16 +1,17 @@
 # 进度
 
 ## 当前任务
-T4 JavaSpringAnalyzer：JavaParser 类信息提取
+T5 Spring 注解识别
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 86 + 集成 4 = 90，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 120 + 集成 6 = 126，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
 - T1 GitHub 仓库浅克隆服务：URL 校验、稀疏浅克隆（4 条 git 命令）、落盘看门狗、三项终检、安全删除。新增单元 41 + 集成 2（真机克隆 spring-petclinic、失败路径）
 - T2 源码文件扫描器：按 `scan.sources[]` 配置扫描、源码根片段匹配推导包名、多模块、排除 package-info/module-info。新增单元 15 + 集成 2（真机扫描 petclinic、真机扫描 8 模块 microservices）
 - T3 LanguageAnalyzer 接口 + 语言中立 DTO：`LanguageAnalyzer`、`LanguageAnalyzerRegistry`、`AnalyzeRequest`、`AnalyzeResult`、`CodeUnitInfo`、`MethodInfo`、`FieldInfo`、`DependencyEdge`、`FailedFile`、`ModelSupport`、`AnalyzerConfiguration`。新增单元 20。**未写任何分析器实现**
+- T4 JavaSpringAnalyzer：JavaParser 3.28.2 语法级解析、两遍处理（解析 + 引用解析成边）、框架识别、失败隔离。新增单元 34 + 集成 2（两黄金样本贯通 T1→T4 全链路）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -76,3 +77,15 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：`AnalyzeRequest` 现在不加进度回调 —— TASKBOOK §07 的 SSE 进度由 T7 在任务层做粗粒度上报，加回调属于提前实现
 - 2026-09-17：T3 交付实测验证：analyzer 包**零 Jackson import**；`ClassInfo`/`analyzeJava`/`CompilationUnit` 仅出现在「刻意不用」的 Javadoc 里；`implements LanguageAnalyzer` **只出现在测试假分析器**中，生产代码零实现
 - 2026-09-17：**已知取舍 —— `analyzer` 包依赖 `repo` 包**（`AnalyzeRequest` 引用 `CodeUnitFileInfo`）。方向合理（分析依赖摄取层的输出）且非循环，故未改动；移动它会违反「不重构已有类」。若将来要让层次更干净，`CodeUnitFileInfo` 应搬到中立的 `model` 包
+- 2026-09-17：T4 依赖定为 `com.github.javaparser:javaparser-core:3.28.2`，**实测零传递依赖**（POM 无 `<dependencies>` 段），不影响 enforcer 的 Jackson 2 护栏；**不用** `javaparser-symbol-solver-core`（§05 预研 2 明确不做符号求解）
+- 2026-09-17：**T4 最贵的坑 —— JavaParser 默认 LanguageLevel 是 `JAVA_11`**。实测用它解析 record / sealed / switch 表达式**全部失败**，现代 Spring 仓库会整批落进 `failedFiles`，而症状会把人引向「JavaParser 不好用」或「这些文件有问题」。故显式设置级别，默认取**最高非 PREVIEW 级别**（3.28.2 实测到 `JAVA_26`），并配测试断言默认级别 ≥ `JAVA_21`，防止依赖降级后天花板悄悄下沉
+- 2026-09-17：T4 只取**顶层类型**为 codeUnits，嵌套类不单独成单元、其成员也不遍历
+- 2026-09-17：**`packageName` / `unitName` 以 AST 为准**，忽略 T2 的路径推导值（目录与包声明可能不一致）
+- 2026-09-17：**名字解析顺序即正确性**（无符号求解）：含 `.` → 原样再当前包前缀；简单名 → 单类型 import → 当前包 → 通配 import。Java 里显式 import 覆盖同包同名类，顺序反了会把边连到错误的类上，而「存在边」这类断言发现不了。泛型参数与数组元素须递归取类型名
+- 2026-09-17：边按 **(from, to) 去重**，保留优先级最高的 kind（`field` > `annotation` > `import`）—— 同一对类画两条箭头会让 Mermaid 图看起来是坏的。**自引用不画自环**；**通配 import 不产生边**（一个 `com.x.*` 会连到该包下所有类，属过度生成），它只参与名字解析
+- 2026-09-17：T4 的 `id` 含 filePath（`repositoryId:filePath#全限定名`）—— 多模块下同一全限定名可能出现在两个模块；语法级解析仍无法区分指向哪个，因此索引冲突时记 WARN
+- 2026-09-17：框架识别标记走配置 `codecompass.analyze.framework-markers`（满足 T5「不在业务层硬编码注解列表」）；多框架并列时按框架名字典序，**保证确定性**，不依赖 Map 迭代顺序
+- 2026-09-17：**每文件一个 try、捕 `Exception`** —— 范围太外则一个坏文件作废整次分析，太窄则缺文件/行范围缺失等异常逃逸成 500。`failedFiles[].filePath` 用 T2 口径的相对路径
+- 2026-09-17：**行号语义 —— JavaParser 把注解算进类型声明范围**，故 `startLine` 指向注解行而非 `class` 关键字行。这对 T10 引用展示是好事（能带出注解上下文），已在集成测试中显式断言该语义
+- 2026-09-17：**JavaParser 类型只出现在 `analyzer/java/` 内** —— 已扫描验证：24 处 javaparser import 全部在该包，`analyzer/` 根包与 `web`/`repo` 包零命中（根包内 2 处命中均为「刻意不用」的 Javadoc 说明）。`LanguageAnalyzer` 生产实现**恰好 1 个**
+- 2026-09-17：T6 范围据此收窄为「图结构整理 + Mermaid 渲染数据」，名字解析与去重已在 T4 完成（已写入 TASKS.md）

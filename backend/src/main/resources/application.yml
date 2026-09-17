@@ -19,10 +19,29 @@ codecompass:
         file-extensions: ['.java']
         excluded-file-names: ['package-info.java', 'module-info.java']
 
+  # Java 分析器配置。框架标记刻意放这里而不是硬编码在代码里（T5 要求「应可配置」）。
+  # 注意：YAML 里 '@' 是保留指示符，标记必须加引号。
+  analyze:
+    java:
+      # 留空 = 取 JavaParser 支持的最高非 PREVIEW 级别。
+      # 不要删掉这行的注释去填 JAVA_11 之类 —— JavaParser 的默认级别就是 JAVA_11，
+      # 用它解析 record / sealed / switch 表达式会整批失败（实测）。
+      language-level:
+    framework-markers:
+      spring:
+        - '@SpringBootApplication'
+        - '@RestController'
+        - '@Controller'
+        - '@Service'
+        - '@Repository'
+        - '@Component'
+        - '@Configuration'
+        - '@Bean'
+        - '@Autowired'
+
   clone:
     # git 可执行文件。默认 "git"，依赖 PATH。
     git-executable: git
-
     # temp-root 不在此处写死：默认取 ${java.io.tmpdir}/codecompass，跨平台自适应。
 
     # 整个克隆流程（4 条 git 命令）的总预算，不是每条命令各自的超时。

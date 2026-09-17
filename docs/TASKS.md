@@ -81,9 +81,21 @@ codecompass:
 
 **要求**：JavaParser 解析；遍历文件解析 CompilationUnit；提取包名 / 类名 / 类注解 / 字段 / 方法 / import；失败文件记录并跳过；语法级解析
 
-**验收**：spring-petclinic 上提取出所有类；language = "java"，framework = "spring"；失败文件有日志
+**依赖**：`com.github.javaparser:javaparser-core:3.28.2`（实测零传递依赖，不影响 enforcer 护栏）。**不用** `javaparser-symbol-solver-core`（§05 预研 2 明确不做符号求解）
 
-**禁止**：不用 Spoon；不实现 Java 以外语言；不在业务层写 Java 特有逻辑
+**关键决策（实测驱动）**：
+- **必须显式设置语言级别** —— 实测 JavaParser 默认 `LanguageLevel` 是 **`JAVA_11`**，用它解析 record / sealed / switch 表达式**全部失败**。默认取「JavaParser 支持的最高非 PREVIEW 级别」（3.28.2 实测支持到 `JAVA_26`），并配测试断言默认级别 ≥ `JAVA_21`，防止依赖降级导致天花板悄悄下沉
+- **只取顶层类型**为 codeUnits；嵌套类不单独成单元，其成员也不遍历
+- **`packageName` / `unitName` 以 AST 为准**，忽略 T2 的路径推导值（目录与包声明可能不一致）
+- **名字解析顺序即正确性**（无符号求解，须自己定）：含 `.` → 直接查 / 当前包前缀；简单名 → 单类型 import → 当前包 → 通配 import → 同文件顶层类型 → 未解析。泛型与数组须递归取类型参数/元素类型
+- **边按 (from, to) 去重**，保留优先级最高的 kind（field > annotation > import）
+- **框架识别标记走配置**（`codecompass.analyze.framework-markers`），满足 T5「不在业务层硬编码注解列表」；多框架命中时按命中数取胜者、数量相同按字典序（保证确定性）
+- **`id` 必须含 filePath** —— 多模块下 `com.foo.Application` 可能同时存在于两个模块，只用全限定名会撞 id 导致边连错
+- **顺序解析不并发**：并发会让 codeUnits / failedFiles 顺序不确定，违背 T3 的确定性承诺
+
+**验收**：spring-petclinic 上提取出所有类；language = "java"，framework = "spring"；失败文件有日志；**多模块下同名不同包的引用连到正确的那个单元**
+
+**禁止**：不用 Spoon；不实现 Java 以外语言；不在业务层写 Java 特有逻辑（JavaParser 类型只允许出现在 `analyzer/java/` 内）；**不做方法级调用图**；**不解析方法体内的局部变量与方法调用**；不动 T3 的 DTO 与接口
 
 ## T5 Spring 注解识别
 
@@ -95,13 +107,15 @@ codecompass:
 
 ## T6 依赖图构建
 
-**输出**：`List<DependencyEdge>` + Mermaid 可渲染图数据
+**输出**：Mermaid 可渲染图数据（边的提取与解析已由 T4 完成）
 
-**要求**：类级依赖图；来源 import / 字段类型 / 注解引用；输出语言中立
+**要求**：图结构整理（孤立节点处理、按模块分组）；输出语言中立
 
-**验收**：spring-petclinic 上存在 OwnerController -> OwnerRepository 的边；图数据能渲染为 Mermaid
+> **与 T4 的划分**：T4 负责「解析并解析引用 → 去重后的 `dependencies`」（含名字解析顺序、同名不同包的正确性）；T6 只做**图结构整理与 Mermaid 渲染数据**。否则 T6 会只剩渲染。
 
-**禁止**：不做方法级调用图；不引入图数据库
+**验收**：spring-petclinic 上存在 OwnerController -> OwnerRepository 的边（该边由 T4 产出，T6 断言其可渲染）；图数据能渲染为 Mermaid
+
+**禁止**：不做方法级调用图；不引入图数据库；**不重复实现名字解析**（用 T4 已产出的边）
 
 ## T7 图数据 REST API
 

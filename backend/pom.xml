@@ -37,6 +37,15 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- T4：语法级 Java 解析。刻意只用 core，不用 javaparser-symbol-solver-core
+         （TASKBOOK §05 预研 2：先做语法级解析，不做符号求解）。
+         实测该 artifact 的 POM 无 <dependencies> 段 —— 零传递依赖。 -->
+    <dependency>
+      <groupId>com.github.javaparser</groupId>
+      <artifactId>javaparser-core</artifactId>
+      <version>3.28.2</version>
+    </dependency>
   </dependencies>
 
   <build>
