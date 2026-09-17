@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T10 LLM 问答
+T11 内存缓存 + 限流
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 188 + 集成 16 = 204，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 208 + 集成 16 = 224，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -17,6 +17,7 @@ T10 LLM 问答
 - T7 图数据 REST API：`RepoController` 三端点、`AnalysisTaskStore`（CAS 原子发布）、`AnalysisOrchestrator`（后台流水线）、`UnitRoleAnnotator` seam、web 视图 DTO。新增单元 21 + 集成 2（真实 petclinic 全链路 HTTP）
 - T8 Vue 类列表 + Mermaid 图：`RepositoryView` / `ClassList` / `DependencyGraphPane` / `stores/repository` / `api/repos`，mermaid 12 动态 import。后端 `/graph` 加 `?unit=&depth=` 邻域参数（控制器加量）。新增后端单元 2
 - T9 代码片段检索层：`CodeRetriever` / `LexicalCodeRetriever` / `RetrievedSnippet` / `RetrieveProperties` / `RetrieveConfiguration`。词法检索（类/方法/字段/注解/包名 token 命中）+ 锚点层（锚点 +10、一跳出边 +3）。纯内存，从 T7 快照取数，无重克隆。新增单元 11
+- T10 LLM 问答接口：`POST /api/repos/{id}/ask`。`LlmClient` 接口 + `OpenAiCompatibleLlmClient`（OpenAI 兼容协议，本地 HttpServer 实测请求体/Bearer/choice 提取）+ `AnswerService`（提示词每行前缀真实行号、宽松解析、引用逐条严格包含校验、不匹配丢弃带反馈重试、预算封顶）。新增单元 20
 
 ## 本地运行（已实测通过）
 ```bash
@@ -141,3 +142,9 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-17：**content 截取是 T10 行号准确率的最后一毫米**：快照行数组按 1-based 闭区间取 `lines[startLine-1 .. endLine-1]`，越界截断。`file` 必须与 T2 `relativePath` 严格同口径（它同时是 `sourceLines` 的 key）；快照缺文件时 **WARN + content 置空**，绝不静默 null
 - 2026-09-17：词法匹配 = camelCase 拆分 + 小写 token 求交 + **全名不分词兜底**（`OWNERCONTROLLER` 型连写输入命中 `OwnerController`）；权重与 `maxSnippets` 全部进 `codecompass.retrieve.*` 配置 —— T10 调参不该重编译
 - 2026-09-17：**surefire 报告怪癖（实测探针钉死）**：`@Nested` + JUnit 6 下控制台按 @DisplayName 容器拆行、顶层类显示 `Tests run: 0`，per-class 求和会少算嵌套测试（当前少 12）；但**失败正确传播**（故意改坏一条嵌套断言 → `Tests run: 12, Failures: 1` → BUILD FAILURE）。计数一律以控制台汇总 / XML 为准
+- 2026-09-18：**ask 状态语义**：未知 404；未完成 409（failed 时携带 errorMessage）；空检索 200 + 提示语（**短路不调 LLM**）；传输/未配置 502（answer 不存在，不降级 200）；校验重试耗尽 200 + 空 references（answer 已存在，丢坏引用保答案）
+- 2026-09-18：**Jackson 3.1.5 的 FAIL_ON_TRAILING_TOKENS 在 `tools.jackson.databind.DeserializationFeature`**（databind 层），不在 StreamReadFeature（javap 实测该枚举无此项）。宽松解析 = `jsonMapper.rebuild().disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build()`，不改全局 Bean
+- 2026-09-18：**Boot 4.1.1 不提供 `RestClient.Builder` 自动配置 Bean**（全量回归 13 个 context 注入失败实测）—— 与 Boot 3.x 不同。装配层自己 `RestClient.builder().requestFactory(带超时).build()`；该构造路径（String 请求体/响应）已由本地 HttpServer 测试实测
+- 2026-09-18：引用校验口径 = **单片段严格包含**（file 字节相等 + language 相同 + 行区间完全落在某片段的 1-based 区间内）；解析按条容忍（行号写成字符串也收），坏条目只丢自身；重试反馈把被丢弃清单原样列给 LLM
+- 2026-09-18：`AnswerResponse` 放 `service/` 包而非 `web/dto/` —— service 层返回自己的结果类型，不反向依赖 web 层（方向性）；`AskRequest` 是入参 DTO，留 web/dto
+- 2026-09-18：**T10 运行态实测**（真实 jar + 真实克隆 petclinic）：404/400/409 各归其位；done 后无 api-key → **502「LLM 未配置」**且发生在任何网络调用之前；配置真实 key 后无需改码即可用（`CODESCOMPASS_LLM_API_KEY` 环境变量或 yml）

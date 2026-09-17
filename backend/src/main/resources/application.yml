@@ -88,3 +88,12 @@ codecompass:
       max-repo-bytes: 524288000
       max-file-bytes: 20971520
       max-files: 1000
+
+  # T10：LLM 问答。api-key 留空 = 未配置，/ask 返回 502（绝不 500）。
+  # 端点走 OpenAI 兼容协议，换 provider 只改配置不改代码。
+  llm:
+    base-url: https://api.openai.com/v1
+    api-key: ${CODESCOMPASS_LLM_API_KEY:}
+    model: gpt-4o-mini
+    timeout: 60s
+    max-attempts: 3

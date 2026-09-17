@@ -15,17 +15,20 @@ import org.springframework.web.bind.annotation.RestController;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.DependencyGraphBuilder;
 import com.codecompass.repo.GitRepositoryCloner;
+import com.codecompass.service.AnswerService;
 import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
+import com.codecompass.service.LlmException;
 import com.codecompass.web.dto.AnalysisTaskView;
+import com.codecompass.web.dto.AskRequest;
 import com.codecompass.web.dto.CreateRepoRequest;
 import com.codecompass.web.dto.ErrorResponse;
 import com.codecompass.web.dto.GraphResponse;
 import com.codecompass.web.dto.NotReadyResponse;
 
 /**
- * T7：图数据 REST API。
+ * T7：图数据 REST API。T10 加问答端点。
  *
  * <p>POST 只做 URL 校验 + 建任务，**不等分析** —— 管线在后台池执行，克隆最长 60 秒，
  * 同步执行会耗尽 Tomcat 线程。
@@ -40,15 +43,18 @@ public class RepoController {
     private final AnalysisOrchestrator orchestrator;
     private final AnalysisTaskStore store;
     private final DependencyGraphBuilder graphBuilder;
+    private final AnswerService answerService;
 
     public RepoController(GitRepositoryCloner cloner,
                           AnalysisOrchestrator orchestrator,
                           AnalysisTaskStore store,
-                          DependencyGraphBuilder graphBuilder) {
+                          DependencyGraphBuilder graphBuilder,
+                          AnswerService answerService) {
         this.cloner = cloner;
         this.orchestrator = orchestrator;
         this.store = store;
         this.graphBuilder = graphBuilder;
+        this.answerService = answerService;
     }
 
     @PostMapping
@@ -96,5 +102,38 @@ public class RepoController {
             default -> ResponseEntity.status(HttpStatus.CONFLICT).body(new NotReadyResponse(
                     taskId, snapshot.status(), "分析尚未完成，当前状态：" + snapshot.status()));
         };
+    }
+
+    /**
+     * T10 问答。答案只能基于 T9 的检索片段；LLM 报出的引用逐条与片段比对（AnswerService 内）。
+     *
+     * <p>状态语义：未知 404；未完成 409（failed 时携带 errorMessage）；
+     * LLM 通道故障 502（answer 根本不存在，不降级 200）。
+     */
+    @PostMapping("/{taskId}/ask")
+    public ResponseEntity<?> ask(@PathVariable String taskId, @RequestBody AskRequest request) {
+        String question = request == null ? null : request.question();
+        if (question == null || question.isBlank()) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("问题不能为空"));
+        }
+        String unitId = request.unitId() == null || request.unitId().isBlank()
+                ? null : request.unitId().trim();
+
+        AnalysisTaskSnapshot snapshot = store.find(taskId).orElse(null);
+        if (snapshot == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("任务不存在"));
+        }
+        if (!AnalysisTaskSnapshot.STATUS_DONE.equals(snapshot.status())) {
+            String message = AnalysisTaskSnapshot.STATUS_FAILED.equals(snapshot.status())
+                    ? "分析失败：" + snapshot.errorMessage()
+                    : "分析尚未完成，当前状态：" + snapshot.status();
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new NotReadyResponse(taskId, snapshot.status(), message));
+        }
+        try {
+            return ResponseEntity.ok(answerService.ask(snapshot, question, unitId));
+        } catch (LlmException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(e.getMessage()));
+        }
     }
 }

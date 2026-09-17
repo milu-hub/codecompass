@@ -16,9 +16,17 @@ import com.codecompass.analyzer.DependencyEdge;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.GraphNode;
 import com.codecompass.repo.GitRepositoryCloner;
+import com.codecompass.retrieve.LexicalCodeRetriever;
+import com.codecompass.retrieve.RetrieveProperties;
+import com.codecompass.service.AnswerService;
 import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
+import com.codecompass.service.LlmClient;
+import com.codecompass.service.LlmException;
+import com.codecompass.service.LlmProperties;
+
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -28,14 +36,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 三个端点的契约：状态码、响应结构稳定性、404/409/400 语义。
+ * 端点契约：状态码、响应结构稳定性、404/409/400 语义。
  *
  * 用 standalone MockMvc + 假编排器 + 真存储 —— 状态由测试直接驱动，不碰网络与线程池。
+ * LLM 用 mock（真实 HTTP 契约由 OpenAiCompatibleLlmClientTest 覆盖）。
  */
 class RepoControllerTest {
 
     private AnalysisTaskStore store;
     private GitRepositoryCloner cloner;
+    private LlmClient llmClient;
     private MockMvc mockMvc;
     private String seededTaskId;
 
@@ -50,10 +60,16 @@ class RepoControllerTest {
         Mockito.when(orchestrator.submit(anyString()))
                 .thenAnswer(invocation -> store.create(invocation.getArgument(0)));
 
+        llmClient = Mockito.mock(LlmClient.class);
+        AnswerService answerService = new AnswerService(
+                new LexicalCodeRetriever(new RetrieveProperties()),
+                llmClient, new LlmProperties(), JsonMapper.builder().build());
+
         mockMvc = MockMvcBuilders.standaloneSetup(new RepoController(
                 cloner, orchestrator, store,
                 new com.codecompass.graph.DependencyGraphBuilder(
-                        new com.codecompass.graph.MermaidRenderer()))).build();
+                        new com.codecompass.graph.MermaidRenderer()),
+                answerService)).build();
     }
 
     // ---------- POST /api/repos ----------
@@ -170,6 +186,119 @@ class RepoControllerTest {
                 .andExpect(jsonPath("$.errorMessage").value("克隆超时（60s）"))
                 .andExpect(jsonPath("$.codeUnits").isArray())
                 .andExpect(jsonPath("$.codeUnits").isEmpty());
+    }
+
+    // ---------- POST /api/repos/{id}/ask ----------
+
+    @Test
+    @DisplayName("ask 未知任务：404")
+    void askOfUnknownTaskReturns404() throws Exception {
+        mockMvc.perform(post("/api/repos/no-such-task/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("任务不存在"));
+    }
+
+    @Test
+    @DisplayName("ask 空问题：400，不触达任何下游")
+    void askWithBlankQuestionReturns400() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("问题不能为空"));
+
+        Mockito.verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    @DisplayName("ask 未完成（running）：409 + 状态说明")
+    void askWhileRunningReturns409() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withProgress(
+                AnalysisTaskSnapshot.STATUS_RUNNING, 60, "解析源码"));
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.taskId").value(taskId))
+                .andExpect(jsonPath("$.status").value("running"))
+                .andExpect(jsonPath("$.error").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("ask 分析失败：409 + 携带 errorMessage")
+    void askWhenFailedReturns409WithErrorDetail() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withFailure("克隆超时（60s）"));
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value("failed"))
+                .andExpect(jsonPath("$.error")
+                        .value(org.hamcrest.Matchers.containsString("克隆超时")));
+    }
+
+    @Test
+    @DisplayName("ask done + LLM 正常：200 + answer/references/model")
+    void askWhenDoneReturnsAnswerWithReferences() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"OwnerController 负责表单提交\",\"references\":[{\"file\":"
+                        + "\"src/main/java/OwnerController.java\",\"language\":\"java\","
+                        + "\"startLine\":1,\"endLine\":9}]}");
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"OwnerController 是干什么的\", \"unitId\": \"repo:u\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("OwnerController 负责表单提交"))
+                .andExpect(jsonPath("$.references[0].file").value("src/main/java/OwnerController.java"))
+                .andExpect(jsonPath("$.references[0].language").value("java"))
+                .andExpect(jsonPath("$.references[0].startLine").value(1))
+                .andExpect(jsonPath("$.references[0].endLine").value(9))
+                .andExpect(jsonPath("$.model").value("gpt-4o-mini"));
+    }
+
+    @Test
+    @DisplayName("ask 检索零命中：200 + 提示语，不调用 LLM")
+    void askWithNoLexicalHitsReturnsFallback() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"zzzz 无交集的词\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer")
+                        .value(org.hamcrest.Matchers.containsString("未检索到")))
+                .andExpect(jsonPath("$.references").isEmpty());
+
+        Mockito.verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    @DisplayName("ask LLM 失败：502 + 明确错误")
+    void askWhenLlmFailsReturns502() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+        Mockito.when(llmClient.complete(anyString(), anyString()))
+                .thenThrow(new LlmException("LLM 未配置"));
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"OwnerController\"}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error")
+                        .value(org.hamcrest.Matchers.containsString("LLM 未配置")));
     }
 
     // ---------- helpers ----------
