@@ -54,8 +54,8 @@
 
 | 样本 | 用途 |
 |---|---|
-| spring-projects/spring-petclinic | 单模块、结构简单，第一版验证 |
-| 一个结构清晰的多模块 Spring Boot 项目 | 测复杂场景 |
+| spring-projects/spring-petclinic | 单模块、结构简单，第一版验证（源码在**根级** `src/main/java`，零前缀） |
+| spring-petclinic/spring-petclinic-microservices | 多模块（8 个模块，无根级源码），测复杂场景 |
 | 一个你熟悉的项目 | 人工判断解析结果是否合理 |
 
 每个仓库需要手工标注：

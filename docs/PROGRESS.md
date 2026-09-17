@@ -58,4 +58,5 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：多语言扩展点落在 `codecompass.scan.sources[]`（language / source-root / file-extensions / excluded-file-names）。新增语言只追加一项，克隆与扫描代码都不改
 - 2026-09-17：**T1 的稀疏检出模式由 `scan.source-root` 派生**（`**/<source-root>/**`），`CloneProperties.pathPatterns` 改名 `extraPathPatterns` 只保留非源码模式（pom.xml）。理由是避免"检出范围"与"扫描范围"两处各配一份而漂移 —— 漂移的后果是 T2 扫出空集合却不报错。这是本轮唯一触碰 T1 的改动，已获豁免
 - 2026-09-17：`CodeUnitFileInfo.packageName` 在默认包时取 `""` 而非 null；结果按 `relativePath` 排序保证确定性；多模块同名类**不按 unitName 去重**
-- 2026-09-17：**待办 —— 多模块真实黄金样本尚未选定**。TASKBOOK §03 要求"一个结构清晰的多模块 Spring Boot 项目"，目前多模块只由合成目录的单测覆盖，未在真实仓库上验证
+- 2026-09-17：**多模块黄金样本定为 `spring-petclinic/spring-petclinic-microservices`**（8 模块，无根级源码，53 个 .java）。与 petclinic 互补：后者单模块、源码在根级，专门照出 glob 方言的零层前缀坑；前者全是带模块名前缀的路径。两者均已进集成测试
+- 2026-09-17：实测该样本克隆+检出 8.4s，落盘 62 文件 / 0.13 MB / 最大单文件 10.5 KB，远在 1000 文件、20MB 单文件、500MB 总大小三项上限之内

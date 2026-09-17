@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -26,6 +28,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SourceFileScannerIntegrationTest {
 
     private static final String PETCLINIC = "https://github.com/spring-projects/spring-petclinic";
+
+    /**
+     * 多模块黄金样本（TASKBOOK §03 第二行）。
+     *
+     * 与 petclinic 恰好互补：petclinic 是单模块、源码在**根级** {@code src/main/java/...}
+     * （零前缀，专门照出 glob 方言的坑）；这个是 8 个模块、**没有**根级源码，
+     * 每一处源码都带模块名前缀。
+     */
+    private static final String MICROSERVICES =
+            "https://github.com/spring-petclinic/spring-petclinic-microservices";
+
+    private static final List<String> MICROSERVICES_MODULES = List.of(
+            "spring-petclinic-admin-server",
+            "spring-petclinic-api-gateway",
+            "spring-petclinic-config-server",
+            "spring-petclinic-customers-service",
+            "spring-petclinic-discovery-server",
+            "spring-petclinic-genai-service",
+            "spring-petclinic-vets-service",
+            "spring-petclinic-visits-service");
 
     @Autowired
     private GitRepositoryCloner cloner;
@@ -79,8 +101,51 @@ class SourceFileScannerIntegrationTest {
         }
     }
 
-    /** 独立于扫描器实现的口径：磁盘上所有满足源码根与扩展名、且未被排除的文件。 */
-    private long countJavaFilesOnDisk(Path repoDir) throws IOException {
+    @Test
+    @DisplayName("真机多模块 microservices：8 个模块全部扫到，包名带模块内的完整层级")
+    void scansRealMultiModuleRepository() throws IOException {
+        CloneResult cloneResult = cloner.clone(MICROSERVICES);
+        assertThat(cloneResult.success())
+                .as("前置克隆应成功，实际错误：%s", cloneResult.errorMessage())
+                .isTrue();
+
+        Path repoDir = Path.of(cloneResult.localPath());
+        try {
+            List<CodeUnitFileInfo> found = scanner.scan(repoDir);
+
+            // 验收：文件数与磁盘实际一致
+            assertThat(found).hasSize((int) countJavaFilesOnDisk(repoDir));
+
+            // 验收：每个模块都扫到，且没有多出预期之外的模块
+            Set<String> scannedModules = found.stream()
+                    .map(info -> info.relativePath().split("/")[0])
+                    .collect(Collectors.toSet());
+            assertThat(scannedModules).containsExactlyInAnyOrderElementsOf(MICROSERVICES_MODULES);
+
+            assertThat(found).allSatisfy(info -> {
+                assertThat(info.language()).isEqualTo("java");
+                assertThat(info.unitName()).isNotBlank();
+                // 包名不能带模块名前缀：模块名不是包的一部分
+                assertThat(info.packageName()).doesNotContain("spring-petclinic");
+            });
+            assertThat(found).extracting(CodeUnitFileInfo::relativePath)
+                    .allSatisfy(path -> assertThat(path).contains("/src/main/java/"));
+
+            // 抽查一个具体的类，确认包名推导在多模块路径下依然正确
+            assertThat(found).anySatisfy(info -> {
+                assertThat(info.unitName()).isEqualTo("CustomersServiceApplication");
+                assertThat(info.relativePath())
+                        .isEqualTo("spring-petclinic-customers-service/src/main/java/"
+                                + "org/springframework/samples/petclinic/customers/CustomersServiceApplication.java");
+                assertThat(info.packageName())
+                        .isEqualTo("org.springframework.samples.petclinic.customers");
+            });
+        } finally {
+            tempWorkspaceManager.delete(repoDir.getParent());
+        }
+    }
+
+    /** 独立于扫描器实现的口径：磁盘上所有满足源码根与扩展名、且未被排除的文件。 */    private long countJavaFilesOnDisk(Path repoDir) throws IOException {
         try (var paths = Files.walk(repoDir)) {
             return paths.filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".java"))
