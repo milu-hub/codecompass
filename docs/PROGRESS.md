@@ -8,6 +8,25 @@ T2 源码文件扫描器
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
 - T1 GitHub 仓库浅克隆服务：URL 校验、稀疏浅克隆（4 条 git 命令）、落盘看门狗、三项终检、安全删除。单元测试 50 个 + 集成测试 2 个（真机克隆 spring-petclinic）
 
+## 本地运行（已实测通过）
+```bash
+# 后端 :8080
+mvn -f backend/pom.xml clean package
+java -jar backend/target/codecompass-backend-0.0.1-SNAPSHOT.jar
+
+# 前端 :5173（Windows 上 npm.ps1 被执行策略拦截，必须走 cmd /c 或 npm.cmd）
+cd frontend && cmd /c "npm install" && cmd /c "npm run dev"
+
+# 测试
+mvn -f backend/pom.xml test                                # 单元测试（集成测试默认排除，可离线重复）
+mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含真机克隆集成测试，需网络
+
+# 前端构建（含类型检查）
+cd frontend && cmd /c "npm run build"
+```
+冒烟结果：后端启动 1.671s 无 WARN/ERROR；`:8080/health` 与经 Vite 代理的 `:5173/health` 均 200；
+首页 200。启动无绑定异常，说明 `codecompass.clone` 下的 `60s` 与字节阈值均正确解析。
+
 ## 阻塞项
 （空）
 
