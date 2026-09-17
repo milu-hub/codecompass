@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T9 代码片段检索层
+T10 LLM 问答
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 177 + 集成 16 = 193，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 188 + 集成 16 = 204，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -16,6 +16,7 @@ T9 代码片段检索层
 - T6 依赖图构建：`DependencyGraphBuilder`、`DependencyGraph`、`GraphNode`、`MermaidRenderer`、`GraphConfiguration`。新增单元 18 + 集成 2（真机图构建 + Mermaid 渲染 + 邻域）
 - T7 图数据 REST API：`RepoController` 三端点、`AnalysisTaskStore`（CAS 原子发布）、`AnalysisOrchestrator`（后台流水线）、`UnitRoleAnnotator` seam、web 视图 DTO。新增单元 21 + 集成 2（真实 petclinic 全链路 HTTP）
 - T8 Vue 类列表 + Mermaid 图：`RepositoryView` / `ClassList` / `DependencyGraphPane` / `stores/repository` / `api/repos`，mermaid 12 动态 import。后端 `/graph` 加 `?unit=&depth=` 邻域参数（控制器加量）。新增后端单元 2
+- T9 代码片段检索层：`CodeRetriever` / `LexicalCodeRetriever` / `RetrievedSnippet` / `RetrieveProperties` / `RetrieveConfiguration`。词法检索（类/方法/字段/注解/包名 token 命中）+ 锚点层（锚点 +10、一跳出边 +3）。纯内存，从 T7 快照取数，无重克隆。新增单元 11
 
 ## 本地运行（已实测通过）
 ```bash
@@ -135,3 +136,8 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-17：T8 点击类取**后端邻域图**（`/graph?unit=&depth=1`，复用 T6 的 neighborhoodOf）；codeUnits 保持全量、边与 mermaid 只含邻域 —— 类列表是稳定锚点。前端不做任何图切分算法
 - 2026-09-17：T8 健康页缩成页脚一行连通性状态，主页面换成仓库分析（health store 保留未删）
 - 2026-09-17：T8 前端不写任何语言判定：role/kind/annotations 全是展示数据，无 `endsWith("Controller")` 之类启发式
+- 2026-09-17：T9 检索层做成**接口** —— TASKBOOK 预留向量检索方向（「不一定用向量数据库」），MVP 词法实现先行，替换时 T10 不动；检索输入全中立类型，对任何语言一视同仁
+- 2026-09-17：**`anchorUnitId` 是中文问题的生命线**（§S7 点类提问）：中文 token 与英文标识符零交集，没有锚点层则中文提问恒为空。锚点 +10 强制入围、其一跳出边依赖 +3 入围；空列表只发生在「无锚点且零词法命中」
+- 2026-09-17：**content 截取是 T10 行号准确率的最后一毫米**：快照行数组按 1-based 闭区间取 `lines[startLine-1 .. endLine-1]`，越界截断。`file` 必须与 T2 `relativePath` 严格同口径（它同时是 `sourceLines` 的 key）；快照缺文件时 **WARN + content 置空**，绝不静默 null
+- 2026-09-17：词法匹配 = camelCase 拆分 + 小写 token 求交 + **全名不分词兜底**（`OWNERCONTROLLER` 型连写输入命中 `OwnerController`）；权重与 `maxSnippets` 全部进 `codecompass.retrieve.*` 配置 —— T10 调参不该重编译
+- 2026-09-17：**surefire 报告怪癖（实测探针钉死）**：`@Nested` + JUnit 6 下控制台按 @DisplayName 容器拆行、顶层类显示 `Tests run: 0`，per-class 求和会少算嵌套测试（当前少 12）；但**失败正确传播**（故意改坏一条嵌套断言 → `Tests run: 12, Failures: 1` → BUILD FAILURE）。计数一律以控制台汇总 / XML 为准
