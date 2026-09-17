@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: codecompass-backend
+
+server:
+  port: 8080
+
+codecompass:
+  service:
+    version: 0.0.1-SNAPSHOT

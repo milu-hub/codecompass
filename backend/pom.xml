@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.1.1</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.codecompass</groupId>
+  <artifactId>codecompass-backend</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>codecompass-backend</name>
+  <description>CodeCompass MVP backend</description>
+
+  <properties>
+    <java.version>21</java.version>
+  </properties>
+
+  <dependencies>
+    <!-- 运行时唯一依赖。注意：不要用已废弃的 spring-boot-starter-web，
+         Spring Boot 4.x 起官方推荐 spring-boot-starter-webmvc。 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!--
+        护栏：禁止 Jackson 2 的 databind/core 被传递依赖拖进 classpath。
+        Jackson 3 的核心类已迁到 tools.jackson.*，注解仍留在
+        com.fasterxml.jackson.annotation.*，且 Jackson 3 的 databind 自身依赖
+        com.fasterxml.jackson.core:jackson-annotations —— 所以绝不能连 annotations 一起禁。
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <executions>
+          <execution>
+            <id>ban-jackson2</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>com.fasterxml.jackson.core:jackson-databind</exclude>
+                    <exclude>com.fasterxml.jackson.core:jackson-core</exclude>
+                  </excludes>
+                  <message>
+                    检测到 Jackson 2 的 databind/core。Jackson 3 已迁到 tools.jackson.*，
+                    请改用 tools.jackson.databind.json.JsonMapper。
+                    注意：jackson-annotations 不在此禁令内（Jackson 3 依赖它）。
+                  </message>
+                </bannedDependencies>
+              </rules>
+              <fail>true</fail>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
