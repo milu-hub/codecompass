@@ -40,6 +40,10 @@ cd frontend && cmd /c "npm run build"
 不加引号会解析失败）。
 T7 后补验（真实运行中的 jar）：`POST /api/repos` 非法 URL → **400** 且错误信息完整；
 `GET /api/repos/no-such/status` → **404**；说明 T7 的控制器、存储、编排器装配在真实应用里生效。
+T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?unit=&depth=1` 邻域返回
+**1 条边（→ OwnerRepository）**，mermaid 只有两个节点，全图 21 条边不受影响。
+**坑**：单元 id 含 `#` 与 `:`，任何不经 URL 编码的拼接都会被当作 HTTP fragment 截断，
+得到空邻域且无报错 —— 前端已用 `encodeURIComponent`，手工 curl / 验收脚本必须同样编码。
 
 > **启动成功不能证明什么**：它证明不了 `JavaSpringAnalyzer` 已被注册表发现 —— 若装配类没被
 > 组件扫描到，`ObjectProvider` 给出空列表，注册表为空，应用照样正常启动、`/health` 照样 200。
