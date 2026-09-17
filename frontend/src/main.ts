@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
 import App from './App.vue'
 
-createApp(App).use(createPinia()).use(ElementPlus).mount('#app')
+// Element Plus 组件与样式由 unplugin-vue-components 按需引入（见 vite.config.ts），
+// 这里不再全量注册组件，也不再引入 element-plus/dist/index.css。
+createApp(App).use(createPinia()).mount('#app')

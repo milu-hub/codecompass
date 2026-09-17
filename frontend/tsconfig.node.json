@@ -1,0 +1,25 @@
+{
+  "include": ["vite.config.ts"],
+  "compilerOptions": {
+    "composite": true,
+    // 必须显式关掉 emit：composite 默认会产出 .js/.d.ts，
+    // 曾经因此在源码目录里生成 vite.config.js 与 vite.config.d.ts。
+    // tsconfig.app.json 是从 @vue/tsconfig 继承到 noEmit 的，这里没继承，必须自己写。
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+
+    "target": "ESNext",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": ["node"],
+
+    "strict": true,
+    "noImplicitThis": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true
+  }
+}
