@@ -138,7 +138,7 @@ public class GitRepositoryCloner {
      * 收紧到单一 host + https 是刻意的：SSH 形式会走密钥与交互提示（与"禁用交互"冲突），
      * 其它协议与 host 都不在本任务范围内。
      */
-    Optional<String> validateRepositoryUrl(String repositoryUrl) {
+    public Optional<String> validateRepositoryUrl(String repositoryUrl) {
         if (repositoryUrl == null || repositoryUrl.isBlank()) {
             return Optional.of("仓库地址不能为空");
         }

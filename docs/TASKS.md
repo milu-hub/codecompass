@@ -131,6 +131,16 @@ codecompass:
 - 不要手动 `new ObjectMapper()`；使用自动配置的 `JsonMapper` Bean，import `tools.jackson.databind.json.JsonMapper`
 - 不要引入 `jackson-datatype-jsr310` 等日期时间模块，也不要注册任何 Module（`JavaTimeModule` 类在 Jackson 3 中已不存在）
 
+**关键决策（已实现，2026-09-17 定）**：
+- **进度用轮询不用 SSE**：TASKBOOK §07 底线写「SSE 推进度」但 TASKS.md T8 写「可轮询」，用户批准 MVP 用轮询、SSE 延后
+- **分析完立即删工作区（守 §07 底线），删除前把源文件内容快照成 `relativePath → 行数组` 存进任务结果**（T9/T10 的原料；内存常驻，T11 加 TTL）
+- **语言隔离 seam `UnitRoleAnnotator`**（中立根包接口）：编排层只依赖它拿角色 Map，不 import `analyzer/java/`；已用 grep 验证 service/web 零命中
+- **原子发布**：状态与结果合并在不可变快照 `AnalysisTaskSnapshot`（结果聚合在 outcome 字段），存储用 `AtomicReference` CAS 整体替换 —— 轮询方永远看不到"done 但结果未就绪"的中间态
+- **后台分析池独立于 T1 看门狗调度器**（克隆最长 60 秒，共用会饿死看门狗）；POST 只校验 + 建任务立即返回
+- POST 同步做 URL 校验（非法即 400）；`validateRepositoryUrl` 从包级提为 public（触碰既有类的唯一最小变更）
+- graph 端点语义：done→200 全量；pending/running→409；failed→200+status:"failed"+errorMessage；未知→404。language 字段始终存在（分析前为 null）
+- **不建 Repository 实体**（commitSha 等留 T11）；taskId 用 UUID、每次提交新任务，去重是 T11 缓存的事
+
 ## T8 Vue 简单类列表 + Mermaid 图
 
 **要求**：输入仓库 URL 输入框；类列表展示；点击类显示依赖图（Mermaid）；分析进度提示（可轮询）

@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import com.codecompass.analyzer.AnalyzeResult;
 import com.codecompass.analyzer.CodeUnitInfo;
+import com.codecompass.analyzer.UnitRoleAnnotator;
 
 /**
  * 配置驱动的核心注解分类。
@@ -31,7 +32,7 @@ import com.codecompass.analyzer.CodeUnitInfo;
  *
  * <p>角色按配置声明顺序取第一个命中者，因此决定性的角色（如 entry）应写在前面。
  */
-public class CoreAnnotationClassifier {
+public class CoreAnnotationClassifier implements UnitRoleAnnotator {
 
     private static final Logger log = LoggerFactory.getLogger(CoreAnnotationClassifier.class);
 
@@ -139,6 +140,19 @@ public class CoreAnnotationClassifier {
                     .forEach(missing::add);
         });
         return missing;
+    }
+
+    /** 实现 {@link UnitRoleAnnotator}：产出 id → 角色 映射，供语言中立的编排层使用。 */
+    @Override
+    public Map<String, String> annotate(AnalyzeResult result) {
+        Map<String, String> roles = new LinkedHashMap<>();
+        if (result == null) {
+            return roles;
+        }
+        for (CodeUnitInfo unit : result.codeUnits()) {
+            roleOf(unit).ifPresent(role -> roles.put(unit.id(), role));
+        }
+        return Map.copyOf(roles);
     }
 
     // ---------- 内部 ----------

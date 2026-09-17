@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T7 图数据 REST API
+T8 Vue 简单类列表 + Mermaid 图
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 154 + 集成 14 = 168，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 175 + 集成 16 = 191，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -14,6 +14,7 @@ T7 图数据 REST API
 - T4 JavaSpringAnalyzer：JavaParser 3.28.2 语法级解析、两遍处理（解析 + 引用解析成边）、框架识别、失败隔离。新增单元 34 + 集成 2（两黄金样本贯通 T1→T4 全链路）
 - T5 Spring 注解识别：`CoreAnnotationClassifier`（配置驱动，零注解字面量）、核心注解角色配置、**黄金样本人工标注**（`src/test/resources/golden/*.yaml`，地面真值独立取得）、覆盖率验收。新增单元 16 + 集成 6（覆盖率/入口类/核心依赖 × 2 样本）
 - T6 依赖图构建：`DependencyGraphBuilder`、`DependencyGraph`、`GraphNode`、`MermaidRenderer`、`GraphConfiguration`。新增单元 18 + 集成 2（真机图构建 + Mermaid 渲染 + 邻域）
+- T7 图数据 REST API：`RepoController` 三端点、`AnalysisTaskStore`（CAS 原子发布）、`AnalysisOrchestrator`（后台流水线）、`UnitRoleAnnotator` seam、web 视图 DTO。新增单元 21 + 集成 2（真实 petclinic 全链路 HTTP）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -114,3 +115,10 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：**悬空边必须过滤** —— Mermaid 遇到未声明节点会**静默创建无标签幽灵节点**。图构建阶段按引用完整性过滤并记 WARN；`neighborhoodOf` 过滤后同样重建校验
 - 2026-09-17：`DependencyGraphBuilder` 的**角色经入参 `Map<String,String>` 传入**而非注入 T5 分类器 —— 后者在 `analyzer/java/`，注入会让语言中立的 graph 包依赖 Spring 概念，R9 失守
 - 2026-09-17：T6 真机实测输出：petclinic 的图 19 节点/21 边，`n5 --> n6` 即 OwnerController -> OwnerRepository（T6 验收标准），语法干净可渲染
+- 2026-09-17：**T7 进度用轮询不用 SSE** —— 用户批准对 §07 底线措辞的明确偏离；分析 10~20s，轮询体验相同
+- 2026-09-17：**T7 清理时机与 T9/T10 内容**：分析完立即删工作区（守 §07 底线），删前快照 `relativePath → 行数组` 进内存结果（受 T1 上限约束、实际很小），供 T9 检索与 T10 引用；T11 加 TTL 回收
+- 2026-09-17：**T7 语言隔离 seam `UnitRoleAnnotator`**（中立根包）：编排层只依赖它，grep 验证 service/web 零 `analyzer/java/` 引用 —— 这是 T12「加语言不改业务层」的前置条件
+- 2026-09-17：**T7 原子发布**：状态与结果合并进不可变快照（结果聚合在 outcome），存储 `AtomicReference` CAS 替换；「status=done 但结果未就绪」的中间态在结构上不存在
+- 2026-09-17：T7 后台分析池（2 线程）独立于 T1 看门狗调度器；POST 只校验 + 建任务立即返回，克隆 60s 不占请求线程
+- 2026-09-17：T7 graph 端点语义：done→200；pending/running→409；failed→200+status:"failed"+errorMessage；未知→404；language 字段始终存在（分析前为 null）
+- 2026-09-17：T7 不建 Repository 实体（commitSha 留 T11）；`validateRepositoryUrl` 包级提 public 是触碰既有类的唯一最小变更

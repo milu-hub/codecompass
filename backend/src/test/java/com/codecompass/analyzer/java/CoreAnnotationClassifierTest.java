@@ -212,4 +212,18 @@ class CoreAnnotationClassifierTest {
                 .as("两份配置各写一份会漂移，这里把漂移显式暴露出来")
                 .containsExactly("@Service");
     }
+
+    @Test
+    @DisplayName("作为 UnitRoleAnnotator：annotate 输出 id→角色 映射，无角色者不进 Map")
+    void annotatesResultWithRoleMap() {
+        CoreAnnotationClassifier classifier = classifier();
+        CodeUnitInfo controller = unit("OwnerController", SPRING, "@Controller");
+        CodeUnitInfo plain = unit("Plain", SPRING);
+        AnalyzeResult result = new AnalyzeResult("repo-1", "java", SPRING,
+                List.of(controller, plain), List.of(), List.of(), List.of());
+
+        Map<String, String> roles = classifier.annotate(result);
+
+        assertThat(roles).containsEntry(controller.id(), "controller").doesNotContainKey(plain.id());
+    }
 }
