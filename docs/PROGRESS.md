@@ -27,7 +27,7 @@ cd frontend && cmd /c "npm install" && cmd /c "npm run dev"
 
 # 测试
 mvn -f backend/pom.xml test                                # 单元测试（集成测试默认排除，可离线重复）
-mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 14 个真机集成测试（克隆 2 + 扫描 2 + 分析 2 + 覆盖率 6 + 图 2），需网络，约 110s
+mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 16 个真机集成测试（克隆 2 + 扫描 2 + 分析 2 + 覆盖率 6 + 图 2 + API 全链路 2），需网络，约 130s
 
 # 前端构建（含类型检查）
 cd frontend && cmd /c "npm run build"
@@ -37,6 +37,8 @@ cd frontend && cmd /c "npm run build"
 启动无绑定异常，说明 `codecompass.scan` / `codecompass.clone` / `codecompass.analyze`
 三处配置均正确解析 —— 包括 framework-markers 里那些带引号的 `@` 标记（YAML 中 `@` 是保留指示符，
 不加引号会解析失败）。
+T7 后补验（真实运行中的 jar）：`POST /api/repos` 非法 URL → **400** 且错误信息完整；
+`GET /api/repos/no-such/status` → **404**；说明 T7 的控制器、存储、编排器装配在真实应用里生效。
 
 > **启动成功不能证明什么**：它证明不了 `JavaSpringAnalyzer` 已被注册表发现 —— 若装配类没被
 > 组件扫描到，`ObjectProvider` 给出空列表，注册表为空，应用照样正常启动、`/health` 照样 200。
