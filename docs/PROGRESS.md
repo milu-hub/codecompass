@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T6 依赖图构建（Mermaid 渲染数据）
+T7 图数据 REST API
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 136 + 集成 12 = 148，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 154 + 集成 14 = 168，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -13,6 +13,7 @@ T6 依赖图构建（Mermaid 渲染数据）
 - T3 LanguageAnalyzer 接口 + 语言中立 DTO：`LanguageAnalyzer`、`LanguageAnalyzerRegistry`、`AnalyzeRequest`、`AnalyzeResult`、`CodeUnitInfo`、`MethodInfo`、`FieldInfo`、`DependencyEdge`、`FailedFile`、`ModelSupport`、`AnalyzerConfiguration`。新增单元 20。**未写任何分析器实现**
 - T4 JavaSpringAnalyzer：JavaParser 3.28.2 语法级解析、两遍处理（解析 + 引用解析成边）、框架识别、失败隔离。新增单元 34 + 集成 2（两黄金样本贯通 T1→T4 全链路）
 - T5 Spring 注解识别：`CoreAnnotationClassifier`（配置驱动，零注解字面量）、核心注解角色配置、**黄金样本人工标注**（`src/test/resources/golden/*.yaml`，地面真值独立取得）、覆盖率验收。新增单元 16 + 集成 6（覆盖率/入口类/核心依赖 × 2 样本）
+- T6 依赖图构建：`DependencyGraphBuilder`、`DependencyGraph`、`GraphNode`、`MermaidRenderer`、`GraphConfiguration`。新增单元 18 + 集成 2（真机图构建 + Mermaid 渲染 + 邻域）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -105,3 +106,11 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：`core-annotations` 与 `framework-markers` **语义不同故分开配置**（前者答"这个类是什么角色"，后者答"仓库是不是 Spring"），但启动时校验一致性并 WARN，把漂移显式暴露而不是硬合并（硬合并会让两件事互相绑架）
 - 2026-09-17：T5 覆盖率实测 **100%**（petclinic 分母 10、microservices 分母 25，全部命中），超出 TASKBOOK 要求的 80%
 - 2026-09-17：**黄金样本的"5 个类的功能描述"由 AI 依源码草拟、尚待人工确认** —— TASKBOOK §03 要求的是手工标注，这部分无法代笔
+- 2026-09-17：**T6 前实测图规模**（临时探针，已删）：petclinic 25 单元/21 边/孤立 6（24%）；microservices 54 单元/38 边/孤立 22（**41%**）；`kind=annotation` 的边为 **0**（仓内自定义注解太少，印证 T3 的判断）。据此确认"孤立节点处理"是真问题、"按模块分组"收益有限
+- 2026-09-17：**模块分组本轮延后**，`GraphNode` 不加 group 字段 —— 图只有 21/38 条边，分组收益有限；代价是要么抽 T2 的源码根定位逻辑、要么让 T6 接收外部映射。将来加字段是纯新增、向后兼容
+- 2026-09-17：**图的结构是契约，mermaid 文本是派生字段**。渲染器独立成 `MermaidRenderer` 并注入，换渲染器不动图模型
+- 2026-09-17：**默认不含孤立节点**（实测 41% 孤立率，全画会散落孤立方框），孤立单元完整列在 `isolatedCodeUnitIds` 供前端提示
+- 2026-09-17：**Mermaid 节点 ID 必须重新映射** —— 真实单元 id 含 `:` `/` `.` `#`，不在 Mermaid ID 语法内，直接使用会静默产出异常节点。映射为 `n0/n1/...`，**先按 id 排序再编号**保证确定性；label 一律加引号；空图降级为占位节点（只有 `graph LR` 一行时 Mermaid 渲染不可靠）
+- 2026-09-17：**悬空边必须过滤** —— Mermaid 遇到未声明节点会**静默创建无标签幽灵节点**。图构建阶段按引用完整性过滤并记 WARN；`neighborhoodOf` 过滤后同样重建校验
+- 2026-09-17：`DependencyGraphBuilder` 的**角色经入参 `Map<String,String>` 传入**而非注入 T5 分类器 —— 后者在 `analyzer/java/`，注入会让语言中立的 graph 包依赖 Spring 概念，R9 失守
+- 2026-09-17：T6 真机实测输出：petclinic 的图 19 节点/21 边，`n5 --> n6` 即 OwnerController -> OwnerRepository（T6 验收标准），语法干净可渲染
