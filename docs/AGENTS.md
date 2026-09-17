@@ -40,7 +40,7 @@ Java 21 + Spring Boot 4.x + Maven + Vue3
 - 产品目标面向多语言，不绑定单一语言
 - MVP 首发只实现 Java / Spring 解析器
 - 只解析 **/src/main/java
-- 单仓库文件数上限 500，大小上限 20MB
+- 单仓库文件数上限 1000，单文件大小上限 20MB，单仓库大小上限 500MB
 - 第一版只做类级依赖图
 - 解析层抽象为 LanguageAnalyzer 接口
 - 数据模型必须含 language / framework 字段
