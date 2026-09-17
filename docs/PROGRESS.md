@@ -75,3 +75,4 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：**仓库外依赖不进依赖图**（如 `OwnerController` 依赖 Spring 的 `@Controller`）。SCHEMA.md 的 `toCodeUnitId` 没有「未解析」的表示。**代价**：`kind="annotation"` 的边只对仓内自定义注解有意义，注解识别体现在 `CodeUnitInfo.annotations` 里而非边
 - 2026-09-17：`AnalyzeRequest` 现在不加进度回调 —— TASKBOOK §07 的 SSE 进度由 T7 在任务层做粗粒度上报，加回调属于提前实现
 - 2026-09-17：T3 交付实测验证：analyzer 包**零 Jackson import**；`ClassInfo`/`analyzeJava`/`CompilationUnit` 仅出现在「刻意不用」的 Javadoc 里；`implements LanguageAnalyzer` **只出现在测试假分析器**中，生产代码零实现
+- 2026-09-17：**已知取舍 —— `analyzer` 包依赖 `repo` 包**（`AnalyzeRequest` 引用 `CodeUnitFileInfo`）。方向合理（分析依赖摄取层的输出）且非循环，故未改动；移动它会违反「不重构已有类」。若将来要让层次更干净，`CodeUnitFileInfo` 应搬到中立的 `model` 包
