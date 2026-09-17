@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T8 Vue 简单类列表 + Mermaid 图
+T9 代码片段检索层
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 175 + 集成 16 = 191，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 177 + 集成 16 = 193，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -15,6 +15,7 @@ T8 Vue 简单类列表 + Mermaid 图
 - T5 Spring 注解识别：`CoreAnnotationClassifier`（配置驱动，零注解字面量）、核心注解角色配置、**黄金样本人工标注**（`src/test/resources/golden/*.yaml`，地面真值独立取得）、覆盖率验收。新增单元 16 + 集成 6（覆盖率/入口类/核心依赖 × 2 样本）
 - T6 依赖图构建：`DependencyGraphBuilder`、`DependencyGraph`、`GraphNode`、`MermaidRenderer`、`GraphConfiguration`。新增单元 18 + 集成 2（真机图构建 + Mermaid 渲染 + 邻域）
 - T7 图数据 REST API：`RepoController` 三端点、`AnalysisTaskStore`（CAS 原子发布）、`AnalysisOrchestrator`（后台流水线）、`UnitRoleAnnotator` seam、web 视图 DTO。新增单元 21 + 集成 2（真实 petclinic 全链路 HTTP）
+- T8 Vue 类列表 + Mermaid 图：`RepositoryView` / `ClassList` / `DependencyGraphPane` / `stores/repository` / `api/repos`，mermaid 12 动态 import。后端 `/graph` 加 `?unit=&depth=` 邻域参数（控制器加量）。新增后端单元 2
 
 ## 本地运行（已实测通过）
 ```bash
@@ -124,3 +125,9 @@ T7 后补验（真实运行中的 jar）：`POST /api/repos` 非法 URL → **40
 - 2026-09-17：T7 后台分析池（2 线程）独立于 T1 看门狗调度器；POST 只校验 + 建任务立即返回，克隆 60s 不占请求线程
 - 2026-09-17：T7 graph 端点语义：done→200；pending/running→409；failed→200+status:"failed"+errorMessage；未知→404；language 字段始终存在（分析前为 null）
 - 2026-09-17：T7 不建 Repository 实体（commitSha 留 T11）；`validateRepositoryUrl` 包级提 public 是触碰既有类的唯一最小变更
+- 2026-09-17：**T8 补齐 Vite `/api` 代理** —— T7 是纯后端任务，代理只配了 `/health`，前端调 `/api/repos` 会 404 且症状与"后端没实现"完全相同。已实测经 :5173 的 POST 穿透到后端返回 400 原文
+- 2026-09-17：T8 的 mermaid 走**动态 import**（12.0.0）：首屏 chunk 157.94 kB，elk 布局引擎等懒块最大 1.4MB、只在渲染时下载；`chunkSizeWarningLimit` 调到 1600 并注明原因（避免常驻警告淹没真实体积回归）
+- 2026-09-17：T8 两个前端竞态防线：mermaid 渲染**递增令牌**（晚到的旧图丢弃，快速切换类不可复现的覆盖 bug 由此排除）；轮询**全 store 单一 timer 句柄**、stopPolling 是唯一清理入口（组件卸载/换任务后旧轮询不搅局）
+- 2026-09-17：T8 点击类取**后端邻域图**（`/graph?unit=&depth=1`，复用 T6 的 neighborhoodOf）；codeUnits 保持全量、边与 mermaid 只含邻域 —— 类列表是稳定锚点。前端不做任何图切分算法
+- 2026-09-17：T8 健康页缩成页脚一行连通性状态，主页面换成仓库分析（health store 保留未删）
+- 2026-09-17：T8 前端不写任何语言判定：role/kind/annotations 全是展示数据，无 `endsWith("Controller")` 之类启发式

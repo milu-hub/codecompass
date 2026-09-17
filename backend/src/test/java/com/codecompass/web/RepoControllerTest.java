@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.codecompass.analyzer.AnalyzeResult;
 import com.codecompass.analyzer.CodeUnitInfo;
+import com.codecompass.analyzer.DependencyEdge;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.GraphNode;
 import com.codecompass.repo.GitRepositoryCloner;
@@ -36,6 +37,7 @@ class RepoControllerTest {
     private AnalysisTaskStore store;
     private GitRepositoryCloner cloner;
     private MockMvc mockMvc;
+    private String seededTaskId;
 
     @BeforeEach
     void setUp() {
@@ -48,8 +50,10 @@ class RepoControllerTest {
         Mockito.when(orchestrator.submit(anyString()))
                 .thenAnswer(invocation -> store.create(invocation.getArgument(0)));
 
-        mockMvc = MockMvcBuilders.standaloneSetup(
-                new RepoController(cloner, orchestrator, store)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new RepoController(
+                cloner, orchestrator, store,
+                new com.codecompass.graph.DependencyGraphBuilder(
+                        new com.codecompass.graph.MermaidRenderer()))).build();
     }
 
     // ---------- POST /api/repos ----------
@@ -170,6 +174,43 @@ class RepoControllerTest {
 
     // ---------- helpers ----------
 
+    /**
+     * 造一个 done 任务：4 个单元 Alpha→Beta→Gamma→Delta 的链。
+     * 单元 id 用 id-a/id-b/id-c/id-d，便于邻域断言。
+     */
+    private void seedDoneWithChain() {
+        seededTaskId = store.create("https://github.com/a/b");
+        CodeUnitInfo alpha = unit("id-a", "Alpha");
+        CodeUnitInfo beta = unit("id-b", "Beta");
+        CodeUnitInfo gamma = unit("id-c", "Gamma");
+        CodeUnitInfo delta = unit("id-d", "Delta");
+
+        List<DependencyEdge> edges = List.of(
+                edge("id-a", "id-b"), edge("id-b", "id-c"), edge("id-c", "id-d"));
+        AnalyzeResult result = new AnalyzeResult("r", "java", "spring",
+                List.of(alpha, beta, gamma, delta), List.of(), edges, List.of());
+        DependencyGraph graph = new DependencyGraph("r", "java", "spring",
+                List.of(node(alpha), node(beta), node(gamma), node(delta)),
+                edges, List.of(), "graph LR\n  n0[\"Alpha\"]\n  n0 --> n1\n");
+        store.update(seededTaskId, snapshot -> snapshot.withDone(
+                new AnalysisTaskSnapshot.AnalysisOutcome(result, graph, Map.of(), Map.of()),
+                "java", "分析完成"));
+    }
+
+    private static CodeUnitInfo unit(String id, String name) {
+        return new CodeUnitInfo(id, "r", "src/main/java/" + name + ".java",
+                "java", "spring", "com.example", name, "class", List.of(), List.of(), 1, 9);
+    }
+
+    private static com.codecompass.graph.GraphNode node(CodeUnitInfo unit) {
+        return new com.codecompass.graph.GraphNode(unit.id(), unit.name(),
+                unit.packageName() + "." + unit.name(), unit.kind(), "", unit.filePath(), 1, 9);
+    }
+
+    private static DependencyEdge edge(String fromId, String toId) {
+        return new DependencyEdge(fromId + "->" + toId, "r", fromId, toId, "field", "java");
+    }
+
     private AnalysisTaskSnapshot.AnalysisOutcome doneOutcome() {
         CodeUnitInfo unit = new CodeUnitInfo("repo:u", "r", "src/main/java/OwnerController.java",
                 "java", "spring", "com.example", "OwnerController", "class",
@@ -182,5 +223,34 @@ class RepoControllerTest {
                 List.of(), List.of(), "graph LR\n  n0[\"OwnerController\"]\n");
         return new AnalysisTaskSnapshot.AnalysisOutcome(result, graph,
                 Map.of(unit.id(), "controller"), Map.of(unit.filePath(), List.of("class OwnerController")));
+    }
+
+    @Test
+    @DisplayName("graph?unit=X&depth=1 返回邻域：codeUnits 仍全量，边与 mermaid 只含邻域")
+    void graphWithUnitParamReturnsNeighborhood() throws Exception {
+        seedDoneWithChain();
+
+        mockMvc.perform(get("/api/repos/" + seededTaskId + "/graph")
+                        .param("unit", "id-b").param("depth", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codeUnits.length()").value(4))
+                .andExpect(jsonPath("$.dependencies.length()").value(2))
+                .andExpect(jsonPath("$.mermaid").value(org.hamcrest.Matchers.containsString("Alpha")))
+                .andExpect(jsonPath("$.mermaid").value(org.hamcrest.Matchers.containsString("Gamma")))
+                .andExpect(jsonPath("$.mermaid")
+                        .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Delta"))));
+    }
+
+    @Test
+    @DisplayName("graph?unit=未知单元 返回空邻域：依赖为空 + 占位 mermaid")
+    void graphWithUnknownUnitReturnsEmptyNeighborhood() throws Exception {
+        seedDoneWithChain();
+
+        mockMvc.perform(get("/api/repos/" + seededTaskId + "/graph").param("unit", "id-ghost"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codeUnits.length()").value(4))
+                .andExpect(jsonPath("$.dependencies").isEmpty())
+                .andExpect(jsonPath("$.mermaid")
+                        .value(org.hamcrest.Matchers.containsString("该范围内没有依赖关系")));
     }
 }

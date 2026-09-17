@@ -12,3 +12,25 @@ export async function getJson<T>(path: string): Promise<T> {
   }
   return (await response.json()) as T
 }
+
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    // 后端 400/404 等错误响应形如 { error: "..." }，尽量把原文带进异常信息
+    let detail = `HTTP ${response.status}`
+    try {
+      const payload = (await response.json()) as { error?: string }
+      if (payload.error) {
+        detail = payload.error
+      }
+    } catch {
+      // 响应体不是 JSON 时忽略
+    }
+    throw new Error(`POST ${path} 失败：${detail}`)
+  }
+  return (await response.json()) as T
+}
