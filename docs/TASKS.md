@@ -15,27 +15,33 @@
 **输入**：GitHub 公开仓库 URL
 **输出**：`CloneResult { localPath, success, errorMessage }`
 
-**要求**：ProcessBuilder 调 git；稀疏浅克隆，路径模式从配置读取；禁用 submodule；60 秒超时；目标目录已存在先删除（校验路径）；分析完删除临时目录（校验路径）
+**要求**：ProcessBuilder 调 git；稀疏浅克隆，路径模式从配置读取；禁用 submodule；60 秒超时（**整个流程的总预算**）；目标目录已存在先删除（校验路径）；分析完删除临时目录（校验路径）
 
-**验收**：spring-petclinic 真实克隆测试（@Tag("integration")）；成功后 localPath 存在 pom.xml；超时有明确错误信息
+**落盘看门狗**：克隆与 sparse-checkout 全程启动落盘监控。**用进程内 NIO 遍历测量，不得调用 `du` 等外部命令**（开发机是 Windows，`du` 非系统自带、且本机只有 IDE 捆绑的 BusyBox 版，会让看门狗静默失效）。每 2 秒测一次临时目录总落盘量，**超过 600 MiB** 即中止整个任务并清理，返回错误「仓库过大或超过资源限制」。看门狗中止与超时中止**必须走同一条 kill 路径**（先 `ProcessHandle.descendants()` 再父进程），不得写两套。
 
-**禁止**：不逐文件调 GitHub API；不执行仓库内脚本；不用 --recurse-submodules
-
-## T2 源码文件扫描器
-
-**输入**：T1 的 localPath
-**输出**：`List<CodeUnitFileInfo>`，含相对路径、包名、类名、language 字段
-
-**要求**：路径模式从配置读取；只扫 `**/src/main/java` 下的 .java；忽略 package-info.java / module-info.java；支持多模块；**扫描前校验仓库限制，超限即拒绝并指明是哪一项超限**
+**终检（克隆成功后）**：三项限制，超限即拒绝并**指明是哪一项超限**
 
 **口径定义（重要）**：因为用 `--filter=blob:none` + 稀疏检出，仓库的"真实"大小与文件总数我们**永远拿不到**（除非全量下载或调 GitHub API，二者都被禁止）。所以三项限制一律按**落盘量**计：
 - 文件数 = 稀疏检出后磁盘上的文件数（含 `pom.xml`）
 - 单文件大小 = 单个落盘文件的字节数
 - 仓库总大小 = `.git` 目录 + 已检出工作区 的字节和
 
-**上限**：文件数 ≤ 1000、单文件 ≤ 20MB、仓库总大小 ≤ 500MB
+**上限**：文件数 ≤ 1000、单文件 ≤ 20MB、仓库总大小 ≤ 500MB。**全部阈值从配置读取**，不得硬编码在类里。
 
-**验收**：文件数与实际一致；每条记录 language = "java"；多模块项目每个模块都扫到；超限仓库被拒绝且错误信息指明超限项
+**验收**：spring-petclinic 真实克隆测试（@Tag("integration")）；成功后 localPath 存在 pom.xml；超时有明确错误信息；看门狗能中止膨胀克隆并返回「仓库过大或超过资源限制」；终检拒绝超限仓库且错误信息指明超限项
+
+**禁止**：不逐文件调 GitHub API；不执行仓库内脚本；不用 --recurse-submodules；**不用 `du` / `wmic` 等外部命令测量磁盘用量**；**不把看门狗与超时写成两套 kill 逻辑**
+
+## T2 源码文件扫描器
+
+**输入**：T1 的 localPath
+**输出**：`List<CodeUnitFileInfo>`，含相对路径、包名、类名、language 字段
+
+**要求**：路径模式从配置读取；只扫 `**/src/main/java` 下的 .java；忽略 package-info.java / module-info.java；支持多模块
+
+> 仓库限制（文件数 / 单文件 / 总大小）的校验在 **T1 终检**完成，T2 不重复校验。
+
+**验收**：文件数与实际一致；每条记录 language = "java"；多模块项目每个模块都扫到
 
 **禁止**：不写死 Java 特有路径；不在业务层判断文件语言；**不要用 `git ls-files` 枚举待解析文件**（稀疏检出的索引里含大量 `skip-worktree` 条目，实测列出 132 个而磁盘只有 31 个，会把不存在的文件送进解析器）
 

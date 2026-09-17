@@ -8,3 +8,29 @@ server:
 codecompass:
   service:
     version: 0.0.1-SNAPSHOT
+
+  clone:
+    # git 可执行文件。默认 "git"，依赖 PATH。
+    git-executable: git
+
+    # temp-root 不在此处写死：默认取 ${java.io.tmpdir}/codecompass，跨平台自适应。
+
+    # 整个克隆流程（4 条 git 命令）的总预算，不是每条命令各自的超时。
+    timeout: 60s
+
+    # 路径模式是"多语言扩展点"：将来支持 Python 只需在此追加一条路径模式，业务层不动。
+    path-patterns:
+      - pom.xml
+      - '**/pom.xml'
+      - '**/src/main/java/**'
+
+    # 三项限制均按落盘量计（.git + 已检出工作区）。
+    # 因为用 --filter=blob:none + 稀疏检出，仓库的真实大小与真实文件总数拿不到。
+    limits:
+      # 看门狗动态中止阈值：500 MiB 的 1.2 倍，留误杀余量
+      watchdog-bytes: 629145600
+      watchdog-interval: 2s
+      # 克隆成功后的终检
+      max-repo-bytes: 524288000
+      max-file-bytes: 20971520
+      max-files: 1000
