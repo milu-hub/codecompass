@@ -40,7 +40,10 @@
 
 **验收**：接口不出现 Java 特有命名；DTO 能容纳 Java 解析结果；预留扩展点
 
-**禁止**：不出现 `ClassInfo`、`JavaClass` 等命名；不实现具体分析器
+**禁止**：
+- 不出现 `ClassInfo`、`JavaClass` 等命名；不实现具体分析器
+- 不要使用 `@JsonSerialize` / `@JsonDeserialize`；如需自定义序列化，import 从 `tools.jackson.databind.annotation.*`
+- 不要 import `com.fasterxml.jackson.databind.*`
 
 ## T4 JavaSpringAnalyzer：JavaParser 类信息提取
 
@@ -80,7 +83,10 @@
 
 **验收**：返回结构稳定；`GET /api/repos/{id}/graph` 返回 `AnalyzeResult`（含 codeUnits、dependencies），前端只取需要的字段；状态区分 pending / running / done / failed；响应带 language 字段
 
-**禁止**：不做登录鉴权；不引入 MySQL
+**禁止**：
+- 不做登录鉴权；不引入 MySQL
+- 不要手动 `new ObjectMapper()`；使用自动配置的 `JsonMapper` Bean，import `tools.jackson.databind.json.JsonMapper`
+- 不要注册 `JavaTimeModule`
 
 ## T8 Vue 简单类列表 + Mermaid 图
 
@@ -109,7 +115,11 @@
 
 **验收**：选中 spring-petclinic 代码提问，返回可跳转行号引用；准确率 ≥ 90%（抽样 20 条）
 
-**禁止**：不把整个仓库塞给 LLM；不允许 LLM 编行号；不在业务层写 Java 特有逻辑
+**禁止**：
+- 不把整个仓库塞给 LLM；不允许 LLM 编行号；不在业务层写 Java 特有逻辑
+- 不要 import `com.fasterxml.jackson.databind.ObjectMapper`；使用 `tools.jackson.databind.json.JsonMapper`
+- 异常捕获用 `JacksonException`，不要用 `JsonProcessingException`
+- 不要注册 `JavaTimeModule`
 
 ## T11 内存缓存 + 限流
 
