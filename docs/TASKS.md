@@ -39,11 +39,27 @@
 
 **要求**：路径模式从配置读取；只扫 `**/src/main/java` 下的 .java；忽略 package-info.java / module-info.java；支持多模块
 
+**配置形态（`codecompass.scan.sources[]`，一份语言配置）**：
+```yaml
+codecompass:
+  scan:
+    sources:
+      - language: java
+        source-root: 'src/main/java'      # 路径片段序列，任意深度命中，同时作为包名根
+        file-extensions: ['.java']
+        excluded-file-names: ['package-info.java', 'module-info.java']
+```
+新增语言只追加一项，T1/T2 代码都不改。T1 的 sparse-checkout 模式由 `source-root` 派生为 `**/<source-root>/**`，避免与扫描范围漂移。
+
+**关键决策（实测驱动）**：**扫描不使用 glob**。实测 Java `PathMatcher` 的 `glob:**/src/main/java/**` 对 `src/main/java/org/foo/Bar.java` 返回 **false**（Java 的 `**/` 不匹配零层目录），而 git 用同一模式确实检出了该文件 —— 两个方言冲突。若直接复用，单模块仓库（黄金样本 petclinic）会静默返回 0 个文件。故改用**源码根片段序列匹配**，顺带得到包名。
+
+**其他口径**：`relativePath` 相对仓库根、统一 `/` 分隔；`packageName` 默认包取 `""`（不是 null）；结果按 `relativePath` 排序保证确定性；多模块下同名类不去重。
+
 > 仓库限制（文件数 / 单文件 / 总大小）的校验在 **T1 终检**完成，T2 不重复校验。
 
 **验收**：文件数与实际一致；每条记录 language = "java"；多模块项目每个模块都扫到
 
-**禁止**：不写死 Java 特有路径；不在业务层判断文件语言；**不要用 `git ls-files` 枚举待解析文件**（稀疏检出的索引里含大量 `skip-worktree` 条目，实测列出 132 个而磁盘只有 31 个，会把不存在的文件送进解析器）
+**禁止**：不写死 Java 特有路径；不在业务层判断文件语言；**不要用 `git ls-files` 枚举待解析文件**（稀疏检出的索引里含大量 `skip-worktree` 条目，实测列出 132 个而磁盘只有 31 个，会把不存在的文件送进解析器）；**不读文件内容推导包名**（会把 Java 语法塞进扫描器，T3 分层当场破功）；**不使用 glob 匹配**（见上）
 
 ## T3 LanguageAnalyzer 接口定义
 

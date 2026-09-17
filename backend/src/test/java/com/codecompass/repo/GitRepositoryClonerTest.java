@@ -44,6 +44,21 @@ class GitRepositoryClonerTest {
         return properties;
     }
 
+    /** 扫描配置（方案 A：克隆的稀疏模式由它派生）。测试可替换以验证派生关系。 */
+    private ScanProperties scan = defaultScan();
+
+    private static ScanProperties defaultScan() {
+        ScanProperties.SourceSpec java = new ScanProperties.SourceSpec();
+        java.setLanguage("java");
+        java.setSourceRoot("src/main/java");
+        java.setFileExtensions(List.of(".java"));
+        java.setExcludedFileNames(List.of("package-info.java", "module-info.java"));
+
+        ScanProperties scanProperties = new ScanProperties();
+        scanProperties.setSources(List.of(java));
+        return scanProperties;
+    }
+
     private GitRepositoryCloner cloner(String gitExecutable) {
         return cloner(gitExecutable, properties -> { });
     }
@@ -54,10 +69,11 @@ class GitRepositoryClonerTest {
             thread.setDaemon(true);
             return thread;
         });
-        CloneProperties properties = properties(gitExecutable);
-        customizer.accept(properties);
-        return new GitRepositoryCloner(properties,
-                new TempWorkspaceManager(properties.getTempRoot()),
+        CloneProperties cloneProperties = properties(gitExecutable);
+        customizer.accept(cloneProperties);
+        return new GitRepositoryCloner(cloneProperties,
+                scan,
+                new TempWorkspaceManager(cloneProperties.getTempRoot()),
                 new GitProcessRunner(),
                 new DiskUsageMeter(),
                 scheduler);
@@ -143,6 +159,28 @@ class GitRepositoryClonerTest {
                 .contains("sparse-checkout", "set")
                 .contains("pom.xml", "**/pom.xml", "**/src/main/java/**");
         assertThat(commands.get(3)).contains("checkout");
+    }
+
+    @Test
+    @DisplayName("稀疏检出模式由 scan.source-root 派生：改配置即改检出范围，不会与扫描范围漂移")
+    void derivesSparsePatternsFromScanSourceRoot() {
+        ScanProperties.SourceSpec python = new ScanProperties.SourceSpec();
+        python.setLanguage("python");
+        python.setSourceRoot("src/main/python");
+        python.setFileExtensions(List.of(".py"));
+        ScanProperties pythonScan = new ScanProperties();
+        pythonScan.setSources(List.of(python));
+        scan = pythonScan;
+
+        List<List<String>> commands =
+                cloner("git").buildCommands(tempRoot.resolve("ws"), "https://github.com/a/b");
+
+        assertThat(commands.get(2))
+                .as("检出范围必须跟着扫描配置走，否则新增语言时会出现"
+                        + "「配了扫描根但文件根本没被检出」的空集合")
+                .contains("**/src/main/python/**")
+                .doesNotContain("**/src/main/java/**");
+        assertThat(commands.get(2)).contains("pom.xml", "**/pom.xml");
     }
 
     @Test

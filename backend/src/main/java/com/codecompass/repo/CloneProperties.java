@@ -23,7 +23,14 @@ public class CloneProperties {
     /** 整个克隆流程（4 条 git 命令）的总预算，不是每条命令各自的超时。 */
     private Duration timeout = Duration.ofSeconds(60);
 
-    private List<String> pathPatterns = List.of("pom.xml", "**/pom.xml", "**/src/main/java/**");
+    /**
+     * 额外的稀疏检出模式：**非源码文件**，用于多模块与构建信息，如构建文件。
+     *
+     * 源码范围**不在这里配** —— 它由 {@link ScanProperties} 的 {@code source-root} 派生
+     * （见 {@link ScanProperties.SourceSpec#sparseCheckoutPattern()}），
+     * 避免"检出范围"与"扫描范围"两处各配一份而漂移。
+     */
+    private List<String> extraPathPatterns = List.of("pom.xml", "**/pom.xml");
 
     private Limits limits = new Limits();
 
@@ -51,12 +58,12 @@ public class CloneProperties {
         this.timeout = timeout;
     }
 
-    public List<String> getPathPatterns() {
-        return pathPatterns;
+    public List<String> getExtraPathPatterns() {
+        return extraPathPatterns;
     }
 
-    public void setPathPatterns(List<String> pathPatterns) {
-        this.pathPatterns = pathPatterns;
+    public void setExtraPathPatterns(List<String> extraPathPatterns) {
+        this.extraPathPatterns = extraPathPatterns;
     }
 
     public Limits getLimits() {

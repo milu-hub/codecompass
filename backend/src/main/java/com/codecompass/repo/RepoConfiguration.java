@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
  * 每次都新建线程池必然泄漏。因此 {@link CloneWatchdog} 只取消自己的任务，不关这个池。
  */
 @Configuration
-@EnableConfigurationProperties(CloneProperties.class)
+@EnableConfigurationProperties({CloneProperties.class, ScanProperties.class})
 public class RepoConfiguration {
 
     @Bean(destroyMethod = "shutdownNow")
@@ -42,12 +42,18 @@ public class RepoConfiguration {
     }
 
     @Bean
+    public SourceFileScanner sourceFileScanner(ScanProperties scanProperties) {
+        return new SourceFileScanner(scanProperties);
+    }
+
+    @Bean
     public GitRepositoryCloner gitRepositoryCloner(CloneProperties properties,
+                                                   ScanProperties scanProperties,
                                                    TempWorkspaceManager tempWorkspaceManager,
                                                    GitProcessRunner gitProcessRunner,
                                                    DiskUsageMeter diskUsageMeter,
                                                    ScheduledExecutorService cloneWatchdogScheduler) {
-        return new GitRepositoryCloner(properties, tempWorkspaceManager, gitProcessRunner,
-                diskUsageMeter, cloneWatchdogScheduler);
+        return new GitRepositoryCloner(properties, scanProperties, tempWorkspaceManager,
+                gitProcessRunner, diskUsageMeter, cloneWatchdogScheduler);
     }
 }

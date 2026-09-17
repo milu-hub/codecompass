@@ -30,17 +30,20 @@ public class GitRepositoryCloner {
     private static final String LOG_FILE_NAME = "clone.log";
 
     private final CloneProperties properties;
+    private final ScanProperties scanProperties;
     private final TempWorkspaceManager workspaces;
     private final GitProcessRunner runner;
     private final DiskUsageMeter meter;
     private final ScheduledExecutorService watchdogScheduler;
 
     public GitRepositoryCloner(CloneProperties properties,
+                               ScanProperties scanProperties,
                                TempWorkspaceManager workspaces,
                                GitProcessRunner runner,
                                DiskUsageMeter meter,
                                ScheduledExecutorService watchdogScheduler) {
         this.properties = properties;
+        this.scanProperties = scanProperties;
         this.workspaces = workspaces;
         this.runner = runner;
         this.meter = meter;
@@ -192,7 +195,13 @@ public class GitRepositoryCloner {
         commands.add(gitInRepo(repoDir, "sparse-checkout", "init", "--no-cone"));
 
         List<String> setPatterns = new ArrayList<>(gitInRepo(repoDir, "sparse-checkout", "set"));
-        setPatterns.addAll(properties.getPathPatterns());
+        setPatterns.addAll(properties.getExtraPathPatterns());
+        // 源码范围由扫描配置派生，确保"检出什么"与"扫描什么"永远一致
+        if (scanProperties.getSources() != null) {
+            scanProperties.getSources().stream()
+                    .map(ScanProperties.SourceSpec::sparseCheckoutPattern)
+                    .forEach(setPatterns::add);
+        }
         commands.add(List.copyOf(setPatterns));
 
         commands.add(gitInRepo(repoDir, "checkout"));

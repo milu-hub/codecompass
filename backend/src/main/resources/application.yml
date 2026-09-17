@@ -9,6 +9,16 @@ codecompass:
   service:
     version: 0.0.1-SNAPSHOT
 
+  # 这是多语言架构的"那一份配置"：新增一门语言只在这里追加一项，
+  # 克隆与扫描的代码都不用改。
+  scan:
+    sources:
+      - language: java
+        # 路径片段序列：出现在任意深度都算命中，同时充当包名推导的基准
+        source-root: 'src/main/java'
+        file-extensions: ['.java']
+        excluded-file-names: ['package-info.java', 'module-info.java']
+
   clone:
     # git 可执行文件。默认 "git"，依赖 PATH。
     git-executable: git
@@ -18,11 +28,12 @@ codecompass:
     # 整个克隆流程（4 条 git 命令）的总预算，不是每条命令各自的超时。
     timeout: 60s
 
-    # 路径模式是"多语言扩展点"：将来支持 Python 只需在此追加一条路径模式，业务层不动。
-    path-patterns:
+    # 额外的稀疏检出模式：非源码文件（构建信息）。
+    # 源码范围不在这里配 —— 由上面的 scan.sources[].source-root 派生为 **/<source-root>/**，
+    # 避免"检出范围"与"扫描范围"漂移。
+    extra-path-patterns:
       - pom.xml
       - '**/pom.xml'
-      - '**/src/main/java/**'
 
     # 三项限制均按落盘量计（.git + 已检出工作区）。
     # 因为用 --filter=blob:none + 稀疏检出，仓库的真实大小与真实文件总数拿不到。

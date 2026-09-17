@@ -1,12 +1,13 @@
 # 进度
 
 ## 当前任务
-T2 源码文件扫描器
+T3 LanguageAnalyzer 接口定义
 
 ## 已完成
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
 - T1 GitHub 仓库浅克隆服务：URL 校验、稀疏浅克隆（4 条 git 命令）、落盘看门狗、三项终检、安全删除。单元测试 50 个 + 集成测试 2 个（真机克隆 spring-petclinic）
+- T2 源码文件扫描器：按 `scan.sources[]` 配置扫描、源码根片段匹配推导包名、多模块、排除 package-info/module-info。单元测试 15 个 + 集成测试 1 个（真机 petclinic，文件数与磁盘实际一致）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -52,3 +53,9 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：**删除工作区前必须清只读位** —— git 在 Windows 上把 `.git/objects/pack/*.pack|.idx|.rev` 设为只读（真机实测 9 个），`Files.delete` 会拒绝，导致克隆成功但清理失败、临时目录永久残留
 - 2026-09-17：「仓库不存在」路径耗时**高度不稳定**（三次实测 2.7s / 57.8s / 63.7s），可能越过 60s 预算而被报成超时。因此超时文案必须点明「仓库不存在 / 私有仓库 / 网络过慢」三种可能，并附 git stderr 尾部
 - 2026-09-17：T2 禁止用 `git ls-files` 枚举待解析文件 —— 稀疏检出的索引含 101 个 `skip-worktree` 幽灵条目（实测列出 132 个而磁盘只有 31 个）
+- 2026-09-17：**T2 不用 glob 匹配**。实测 Java `PathMatcher` 的 `glob:**/src/main/java/**` 对 `src/main/java/org/foo/Bar.java` 返回 **false**（Java 的 `**/` 不匹配零层目录），而 git 用同一模式确实检出了该文件 —— 两个方言冲突。若直接复用，单模块仓库（黄金样本 petclinic）会**静默返回 0 个文件**。改用**源码根片段序列匹配**（任意深度命中、取最后一次出现）
+- 2026-09-17：T2 **不读文件内容推导包名** —— 纯路径推导。否则某门语言的语法知识会渗进语言无关的扫描器，T3 的 LanguageAnalyzer 分层当场破功
+- 2026-09-17：多语言扩展点落在 `codecompass.scan.sources[]`（language / source-root / file-extensions / excluded-file-names）。新增语言只追加一项，克隆与扫描代码都不改
+- 2026-09-17：**T1 的稀疏检出模式由 `scan.source-root` 派生**（`**/<source-root>/**`），`CloneProperties.pathPatterns` 改名 `extraPathPatterns` 只保留非源码模式（pom.xml）。理由是避免"检出范围"与"扫描范围"两处各配一份而漂移 —— 漂移的后果是 T2 扫出空集合却不报错。这是本轮唯一触碰 T1 的改动，已获豁免
+- 2026-09-17：`CodeUnitFileInfo.packageName` 在默认包时取 `""` 而非 null；结果按 `relativePath` 排序保证确定性；多模块同名类**不按 unitName 去重**
+- 2026-09-17：**待办 —— 多模块真实黄金样本尚未选定**。TASKBOOK §03 要求"一个结构清晰的多模块 Spring Boot 项目"，目前多模块只由合成目录的单测覆盖，未在真实仓库上验证

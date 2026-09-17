@@ -2,3 +2,7 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 .mvn/
 *.log
+
+# IDE 产物（IntelliJ 打开工程时会自动生成，不应入库）
+.idea/
+*.iml
