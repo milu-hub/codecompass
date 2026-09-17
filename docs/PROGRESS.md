@@ -26,7 +26,7 @@ cd frontend && cmd /c "npm install" && cmd /c "npm run dev"
 
 # 测试
 mvn -f backend/pom.xml test                                # 单元测试（集成测试默认排除，可离线重复）
-mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 12 个真机集成测试（克隆 2 + 扫描 2 + 分析 2 + 覆盖率 6），需网络，约 90s
+mvn -f backend/pom.xml test -Dsurefire.excludedGroups=     # 含 14 个真机集成测试（克隆 2 + 扫描 2 + 分析 2 + 覆盖率 6 + 图 2），需网络，约 110s
 
 # 前端构建（含类型检查）
 cd frontend && cmd /c "npm run build"
