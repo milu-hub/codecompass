@@ -1,15 +1,16 @@
 # 进度
 
 ## 当前任务
-T3 LanguageAnalyzer 接口定义
+T4 JavaSpringAnalyzer：JavaParser 类信息提取
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 66 + 集成 4 = 70，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 86 + 集成 4 = 90，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
 - T1 GitHub 仓库浅克隆服务：URL 校验、稀疏浅克隆（4 条 git 命令）、落盘看门狗、三项终检、安全删除。新增单元 41 + 集成 2（真机克隆 spring-petclinic、失败路径）
 - T2 源码文件扫描器：按 `scan.sources[]` 配置扫描、源码根片段匹配推导包名、多模块、排除 package-info/module-info。新增单元 15 + 集成 2（真机扫描 petclinic、真机扫描 8 模块 microservices）
+- T3 LanguageAnalyzer 接口 + 语言中立 DTO：`LanguageAnalyzer`、`LanguageAnalyzerRegistry`、`AnalyzeRequest`、`AnalyzeResult`、`CodeUnitInfo`、`MethodInfo`、`FieldInfo`、`DependencyEdge`、`FailedFile`、`ModelSupport`、`AnalyzerConfiguration`。新增单元 20。**未写任何分析器实现**
 
 ## 本地运行（已实测通过）
 ```bash
@@ -65,3 +66,12 @@ cd frontend && cmd /c "npm run build"
 - 2026-09-17：**多模块黄金样本定为 `spring-petclinic/spring-petclinic-microservices`**（8 模块，无根级源码，53 个 .java）。与 petclinic 互补：后者单模块、源码在根级，专门照出 glob 方言的零层前缀坑；前者全是带模块名前缀的路径。两者均已进集成测试
 - 2026-09-17：实测该样本克隆+检出 8.4s，落盘 62 文件 / 0.13 MB / 最大单文件 10.5 KB，远在 1000 文件、20MB 单文件、500MB 总大小三项上限之内
 - 2026-09-17：**TASKBOOK §03 的第三个黄金样本（「一个你熟悉的项目」）仍待用户选定** —— 它用于人工判断解析结果是否合理，无法代选。T12 端到端验收会用到
+- 2026-09-17：T3 把 `LanguageAnalyzerRegistry` 纳入交付 —— 它是「业务层不点名实现类」的结构保证，也是 T12「加 Python stub，业务层不改」的落地机制；内部无任何语言分支，只做 Map 查表。装配用 `ObjectProvider`，因为 T3 阶段一个分析器实现都没有，直接注入 `List<LanguageAnalyzer>` 会让容器启动失败
+- 2026-09-17：**`CodeUnitInfo.kind` 与 `DependencyEdge.kind` 用开放字符串而非 enum** —— enum 会成为每门新语言都必须编辑的共享类型，违反「新增语言只应新增一个实现与一份配置」，并会让 T12 验收失败
+- 2026-09-17：**行号定为 1-based 闭区间，并在 record 构造器上守卫**（`startLine < 1` 或 `endLine < startLine` 直接抛异常）。SCHEMA.md 里的 `"startLine": 0` 只是占位符却极像「从 0 开始」；真按 0-based 实现会让 T10 的引用跳转整体偏一行，而这是编译、单测、演示都看不出来的错误
+- 2026-09-17：核心 DTO 的列表字段在构造器里做 null→空列表规范化 + 不可变复制；列表中的 null 元素被拒绝
+- 2026-09-17：`id` 契约要求**确定性**（同输入同输出、仓库内唯一）但**不规定格式** —— 格式属于分析器实现细节，规定了就把语言细节钉进中立层。对应测试断言性质而非具体值
+- 2026-09-17：`framework` 未识别时取 `""`（与 `packageName` 默认包口径一致，前端 TS 可写 `string`）；它是识别结果而非配置项
+- 2026-09-17：**仓库外依赖不进依赖图**（如 `OwnerController` 依赖 Spring 的 `@Controller`）。SCHEMA.md 的 `toCodeUnitId` 没有「未解析」的表示。**代价**：`kind="annotation"` 的边只对仓内自定义注解有意义，注解识别体现在 `CodeUnitInfo.annotations` 里而非边
+- 2026-09-17：`AnalyzeRequest` 现在不加进度回调 —— TASKBOOK §07 的 SSE 进度由 T7 在任务层做粗粒度上报，加回调属于提前实现
+- 2026-09-17：T3 交付实测验证：analyzer 包**零 Jackson import**；`ClassInfo`/`analyzeJava`/`CompilationUnit` 仅出现在「刻意不用」的 Javadoc 里；`implements LanguageAnalyzer` **只出现在测试假分析器**中，生产代码零实现
