@@ -62,7 +62,8 @@ Java 21 + Spring Boot 4.x + Maven + Vue3
   但注解仍保留在 `com.fasterxml.jackson.annotation.*`；
   `@JsonSerialize` / `@JsonDeserialize` 随核心类走，改为 `tools.jackson.databind.annotation.*`
 - 不要手动 `new ObjectMapper()`；使用 Spring Boot 自动配置的 `JsonMapper` Bean
-- 不要注册 `JavaTimeModule`（Jackson 3 已内置）
+- 不要引入 `jackson-datatype-jsr310` 等日期时间模块，也不要注册任何 Module
+  （Java 8 日期时间支持已内置进 `jackson-databind`，`JavaTimeModule` 类在 Jackson 3 中已不存在）
 
 请先给接口定义、数据结构和关键流程，不要写完整实现。
 列出你认为最容易出错的三个点。
@@ -80,6 +81,10 @@ Java 21 + Spring Boot 4.x + Maven + Vue3
 - 不要做学习路线 / 测验 / 成就 / 分享页
 - 不要重构已有类
 - 不要输出与当前任务无关的文件
+- 不要使用 Jackson 2 的 import（`com.fasterxml.jackson.databind.*`）；Jackson 3 核心类在 `tools.jackson.databind.*`，注解仍在 `com.fasterxml.jackson.annotation.*`
+- 不要手动 `new ObjectMapper()`；使用 Spring Boot 自动配置的 `JsonMapper` Bean
+- 不要引入 `jackson-datatype-jsr310` 等日期时间模块，也不要注册任何 Module（`JavaTimeModule` 类在 Jackson 3 中已不存在）
+- 不要禁 `com.fasterxml.jackson.core:jackson-annotations`：Jackson 3 的 databind 自身依赖它
 
 ## 模型使用策略
 - **Max 档**：架构设计、疑难 bug、复杂重构

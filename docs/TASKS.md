@@ -42,8 +42,8 @@
 
 **禁止**：
 - 不出现 `ClassInfo`、`JavaClass` 等命名；不实现具体分析器
-- 不要使用 `@JsonSerialize` / `@JsonDeserialize`；如需自定义序列化，import 从 `tools.jackson.databind.annotation.*`
-- 不要 import `com.fasterxml.jackson.databind.*`
+- 不要 import 任何 Jackson 类型（`tools.jackson.*` / `com.fasterxml.jackson.*`）：语言中立的核心模型不依赖序列化框架
+- 如确有自定义序列化需求，不要改核心 DTO，在 web 层用 MixIn 或专门的 web DTO 处理
 
 ## T4 JavaSpringAnalyzer：JavaParser 类信息提取
 
@@ -86,7 +86,7 @@
 **禁止**：
 - 不做登录鉴权；不引入 MySQL
 - 不要手动 `new ObjectMapper()`；使用自动配置的 `JsonMapper` Bean，import `tools.jackson.databind.json.JsonMapper`
-- 不要注册 `JavaTimeModule`
+- 不要引入 `jackson-datatype-jsr310` 等日期时间模块，也不要注册任何 Module（`JavaTimeModule` 类在 Jackson 3 中已不存在）
 
 ## T8 Vue 简单类列表 + Mermaid 图
 
@@ -119,7 +119,8 @@
 - 不把整个仓库塞给 LLM；不允许 LLM 编行号；不在业务层写 Java 特有逻辑
 - 不要 import `com.fasterxml.jackson.databind.ObjectMapper`；使用 `tools.jackson.databind.json.JsonMapper`
 - 异常捕获用 `JacksonException`，不要用 `JsonProcessingException`
-- 不要注册 `JavaTimeModule`
+- 不要引入 `jackson-datatype-jsr310` 等日期时间模块，也不要注册任何 Module（`JavaTimeModule` 类在 Jackson 3 中已不存在）
+- 解析 LLM 输出不要改全局 `JsonMapper` Bean：Jackson 3 的 mapper 不可变，用 `jsonMapper.rebuild()` 派生 T10 专用实例，按需放开 `FAIL_ON_TRAILING_TOKENS`
 
 ## T11 内存缓存 + 限流
 
