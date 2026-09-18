@@ -62,6 +62,37 @@
   box-sizing: border-box;
 }
 
+/**
+ * 应用外壳撑满视口：顶部栏 / 主区 / 底部状态条 三段式 flex 列。
+ *
+ * 这里必须用 **height**（确定高度）而不是 min-height —— 实测教训：用 min-height 时
+ * 容器高度不确定，子项的 flex: 1 拿不到确定的可用空间，三栏主区会退化成按内容 max-content
+ * 撑开（类列表 925px 的内容把主区顶到 975px，整页反而多滚 200px）。
+ * 窗口太矮时靠 min-height 兜底（外壳高度 = 固定 chrome + 主区最小 480），让整页滚动。
+ */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  /* 顶部栏 49 + 卡片上边距 24 + 卡片头 40 + 输入行 32 + 主区上边距 16 + 页脚上边距 12 + 页脚 37 */
+  min-height: calc(210px + 480px);
+}
+
+/** 拖拽分栏期间：全局禁选 + 统一光标（否则鼠标划过文字会变 I-beam、还会选中文本） */
+body.cc-resizing,
+body.cc-resizing * {
+  user-select: none;
+  cursor: col-resize;
+}
+
+/** 窄屏：三栏纵向堆叠，外壳交回内容高度（每栏各占一屏） */
+@media (max-width: 899px) {
+  #app {
+    height: auto;
+    min-height: 100dvh;
+  }
+}
+
 html,
 body {
   margin: 0;

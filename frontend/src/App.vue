@@ -34,6 +34,8 @@ onMounted(() => {
   position: sticky;
   top: 0;
   z-index: 100;
+  /* 外壳是 flex 列：顶部栏与底部状态条固定，主区吃剩余高度 */
+  flex-shrink: 0;
   border-bottom: 1px solid var(--cc-glass-line);
 }
 
@@ -55,6 +57,7 @@ onMounted(() => {
 .app-footer {
   text-align: center;
   /* 页脚只是连通性一行字，别占掉工作台的高度 */
+  flex-shrink: 0;
   margin-top: 12px;
   padding: 8px;
   color: #909399;
