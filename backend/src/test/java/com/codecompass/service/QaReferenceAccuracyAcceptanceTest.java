@@ -22,6 +22,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import com.codecompass.retrieve.LexicalCodeRetriever;
 import com.codecompass.retrieve.RetrieveProperties;
 import com.codecompass.testutil.MutableClock;
+import com.codecompass.testutil.PetclinicQaGroundTruth;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -30,9 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * T12 要求 3：问答引用行号准确率 ≥ 90%。
  *
- * <p><b>地面真值独立于被测代码</b>：问题集手写，每条引用 = 期望文件 + 源码文本标记
- * （marker），由**源码快照文本**定位行号 —— 不经解析器、不经检索层，避免自己证明自己。
- * 桩 LLM 回放地面真值引用；准确率 = 通过校验（即检索层带回了覆盖该行的片段）的引用比例。
+ * <p><b>地面真值独立于被测代码</b>：问题集手写（{@link PetclinicQaGroundTruth}），
+ * 每条引用 = 期望文件 + 源码文本标记（marker），由**源码快照文本**定位行号 ——
+ * 不经解析器、不经检索层，避免自己证明自己。桩 LLM 回放地面真值引用；
+ * 准确率 = 通过校验（即检索层带回了覆盖该行的片段）的引用比例。
  *
  * <p>真机克隆 petclinic，需要网络，@Tag("integration")。
  */
@@ -55,31 +57,6 @@ class QaReferenceAccuracyAcceptanceTest {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    /** 20 条抽样（§04 口径「每次抽样 20 条」）：question + 锚点类名（可空）+ 期望文件后缀 + 源码 marker。 */
-    private static List<GroundTruthItem> items() {
-        return List.of(
-                new GroundTruthItem("OwnerController 是干什么的", "OwnerController", "OwnerController.java", "class OwnerController"),
-                new GroundTruthItem("processFindForm 方法做什么", "OwnerController", "OwnerController.java", "processFindForm"),
-                new GroundTruthItem("initFindForm 是做什么的", "OwnerController", "OwnerController.java", "initFindForm"),
-                new GroundTruthItem("PetController 的 initCreationForm", "PetController", "PetController.java", "initCreationForm"),
-                new GroundTruthItem("processCreationForm 做什么", "PetController", "PetController.java", "processCreationForm"),
-                new GroundTruthItem("VetController 如何展示兽医列表", "VetController", "VetController.java", "showVetList"),
-                new GroundTruthItem("VisitController 是干什么的", "VisitController", "VisitController.java", "class VisitController"),
-                new GroundTruthItem("OwnerRepository 的 findByLastName", "OwnerRepository", "OwnerRepository.java", "findByLastName"),
-                new GroundTruthItem("Owner 实体", "Owner", "Owner.java", "class Owner"),
-                new GroundTruthItem("Pet 实体有哪些类型", "Pet", "Pet.java", "class Pet"),
-                new GroundTruthItem("Visit 实体是什么", null, "Visit.java", "class Visit"),
-                new GroundTruthItem("Vet 实体是什么", null, "Vet.java", "class Vet"),
-                new GroundTruthItem("Specialty 实体是什么", null, "Specialty.java", "class Specialty"),
-                new GroundTruthItem("PetValidator 是干什么的", "PetValidator", "PetValidator.java", "class PetValidator"),
-                new GroundTruthItem("PetTypeFormatter 是干什么的", "PetTypeFormatter", "PetTypeFormatter.java", "class PetTypeFormatter"),
-                new GroundTruthItem("PetTypeRepository 是做什么的", null, "PetTypeRepository.java", "interface PetTypeRepository"),
-                new GroundTruthItem("VetRepository 是做什么的", null, "VetRepository.java", "interface VetRepository"),
-                new GroundTruthItem("BaseEntity 是什么", null, "BaseEntity.java", "class BaseEntity"),
-                new GroundTruthItem("Person 实体是什么", null, "Person.java", "class Person"),
-                new GroundTruthItem("NamedEntity 是什么", null, "NamedEntity.java", "class NamedEntity"));
-    }
-
     @Test
     @DisplayName("抽样 20 条：引用逐条通过检索校验且内容命中 marker，准确率 ≥ 90%")
     void referenceLineAccuracyAcceptance() throws Exception {
@@ -100,7 +77,7 @@ class QaReferenceAccuracyAcceptanceTest {
 
         int passed = 0;
         List<String> failures = new ArrayList<>();
-        for (GroundTruthItem item : items()) {
+        for (PetclinicQaGroundTruth.Item item : PetclinicQaGroundTruth.items()) {
             AnswerResponse.Reference groundTruth = locateMarker(outcome, item);
             stubLlm.canned = cannedJson(groundTruth);
             AnswerResponse response = service.ask(
@@ -115,8 +92,8 @@ class QaReferenceAccuracyAcceptanceTest {
             }
         }
 
-        double accuracy = passed / (double) items().size();
-        log.info("T12 引用行号准确率实测：{}/{} = {}%", passed, items().size(), accuracy * 100);
+        double accuracy = passed / (double) PetclinicQaGroundTruth.items().size();
+        log.info("T12 引用行号准确率实测：{}/{} = {}%", passed, PetclinicQaGroundTruth.items().size(), accuracy * 100);
         assertThat(accuracy)
                 .as("准确率必须 ≥ " + ACCURACY_TARGET * 100 + "%，未通过条目：" + failures)
                 .isGreaterThanOrEqualTo(ACCURACY_TARGET);
@@ -125,7 +102,7 @@ class QaReferenceAccuracyAcceptanceTest {
     // ---------- 地面真值（独立于解析器与检索层） ----------
 
     private static AnswerResponse.Reference locateMarker(AnalysisTaskSnapshot.AnalysisOutcome outcome,
-                                                         GroundTruthItem item) {
+                                                         PetclinicQaGroundTruth.Item item) {
         Map.Entry<String, List<String>> file = outcome.sourceLines().entrySet().stream()
                 .filter(entry -> entry.getKey().endsWith(item.fileSuffix()))
                 .findFirst()
@@ -172,10 +149,6 @@ class QaReferenceAccuracyAcceptanceTest {
                 + "\",\"language\":\"" + reference.language()
                 + "\",\"startLine\":" + reference.startLine()
                 + ",\"endLine\":" + reference.endLine() + "}]}";
-    }
-
-    private record GroundTruthItem(String question, String anchorClassName,
-                                   String fileSuffix, String marker) {
     }
 
     /** 桩 LLM：只回放地面真值引用，绝不从检索结果派生 —— 否则验收变成自己证明自己。 */

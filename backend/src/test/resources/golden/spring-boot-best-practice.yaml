@@ -1,0 +1,304 @@
+# 黄金样本人工标注：javastacks/spring-boot-best-practice（第三个黄金样本，用户指定）
+#
+# 地面真值的取得方式：用独立脚本直接解析原始源码的注解行，**不经过本项目解析器**。
+# 生成后落盘固定，脚本即弃（与 T5 两个样本同款纪律）。
+#
+# 覆盖率口径（TASKBOOK §04）：分母 = coreAnnotatedClasses 的数量。
+
+repository: https://github.com/javastacks/spring-boot-best-practice
+language: java
+framework: spring
+scannedJavaFiles: 179
+
+# TASKBOOK §03 要求：入口类（39 个模块级 @SpringBootApplication）
+entryClasses:
+  - cn.javastack.Application
+  - cn.javastack.application.Application
+  - cn.javastack.mongodb.Application
+  - cn.javastack.springboot.activemq.Application
+  - cn.javastack.springboot.actuator.Application
+  - cn.javastack.springboot.admin.client.Application
+  - cn.javastack.springboot.admin.server.Application
+  - cn.javastack.springboot.aop.Application
+  - cn.javastack.springboot.cache.Application
+  - cn.javastack.springboot.docker.DockerApplication
+  - cn.javastack.springboot.ds.Application
+  - cn.javastack.springboot.es.Application
+  - cn.javastack.springboot.features.Application
+  - cn.javastack.springboot.flyway.Application
+  - cn.javastack.springboot.graalvm.Application
+  - cn.javastack.springboot.jasypt.Application
+  - cn.javastack.springboot.jetty.Application
+  - cn.javastack.springboot.jpa.Application
+  - cn.javastack.springboot.kafka.Application
+  - cn.javastack.springboot.knife4j.Knife4jApplication
+  - cn.javastack.springboot.logging.Application
+  - cn.javastack.springboot.mail.Application
+  - cn.javastack.springboot.mapstruct.Application
+  - cn.javastack.springboot.mybatis.Application
+  - cn.javastack.springboot.mybatisplus.Application
+  - cn.javastack.springboot.properties.Application
+  - cn.javastack.springboot.quartz.Application
+  - cn.javastack.springboot.quickstart.Application
+  - cn.javastack.springboot.rabbitmq.Application
+  - cn.javastack.springboot.redis.Application
+  - cn.javastack.springboot.restservices.Application
+  - cn.javastack.springboot.schedule.Application
+  - cn.javastack.springboot.session.Application
+  - cn.javastack.springboot.starter.Application
+  - cn.javastack.springboot.starter.sample.Application
+  - cn.javastack.springboot.test.Application
+  - cn.javastack.springboot.tinylog.Application
+  - cn.javastack.springboot.web.Application
+  - cn.javastack.springboot.webflux.Application
+
+# 覆盖率的分母：带核心注解的类（共 109 个；多注解类取角色优先的第一个）
+coreAnnotatedClasses:
+  - name: cn.javastack.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.application.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.application.designpattern.observer.ObserverConfiguration
+    annotation: '@Configuration'
+  - name: cn.javastack.mongodb.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.mongodb.MongoController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.activemq.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.activemq.MsgController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.actuator.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.actuator.config.SecurityConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.actuator.controller.LoginController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.actuator.endpoint.TestEndpoint
+    annotation: '@Component'
+  - name: cn.javastack.springboot.actuator.metrics.MetricsConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.actuator.observation.IndexObservation
+    annotation: '@Component'
+  - name: cn.javastack.springboot.admin.client.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.admin.client.SecurityPermitAllConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.admin.server.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.aop.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.aop.aspect.CalcAspect
+    annotation: '@Component'
+  - name: cn.javastack.springboot.aop.controller.CalcController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.aop.service.CalcServiceImpl
+    annotation: '@Service'
+  - name: cn.javastack.springboot.cache.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.cache.CacheConfiguration
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.cache.CacheController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.cache.CacheService
+    annotation: '@Service'
+  - name: cn.javastack.springboot.docker.DockerApplication
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.ds.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.ds.dao.impl.UserDaoImpl
+    annotation: '@Service'
+  - name: cn.javastack.springboot.ds.DsConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.es.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.es.ElasticsearchSslConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.es.EsController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.features.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.features.core.LogService
+    annotation: '@Service'
+  - name: cn.javastack.springboot.features.core.UserService
+    annotation: '@Service'
+  - name: cn.javastack.springboot.features.listener.JavastackListener
+    annotation: '@Component'
+  - name: cn.javastack.springboot.flyway.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.graalvm.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.jasypt.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.jetty.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.jpa.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.jpa.controller.UserController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.kafka.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.kafka.KafkaConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.kafka.MsgController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.knife4j.api.Knife4jController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.knife4j.config.Knife4jConfiguration
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.knife4j.Knife4jApplication
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.logging.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.logging.LogController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.mail.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.mail.EmailController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.mapstruct.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.mybatis.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.mybatis.controller.UserController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.mybatisplus.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.mybatisplus.controller.UserController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.mybatisplus.service.UserServiceImpl
+    annotation: '@Service'
+  - name: cn.javastack.springboot.properties.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.properties.props.DbProperties
+    annotation: '@Component'
+  - name: cn.javastack.springboot.quartz.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.quartz.TaskConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.quickstart.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.rabbitmq.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.rabbitmq.MsgController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.rabbitmq.RabbitMQConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.redis.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.redis.config.RedisConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.redis.RedisController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.restservices.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.restservices.config.HttpServiceGroupConfiguration
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.restservices.config.WebConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.restservices.controller.AccountController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.restservices.controller.CallRestController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.restservices.controller.UserController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.restservices.handler.CustomRestTemplateCustomizer
+    annotation: '@Component'
+  - name: cn.javastack.springboot.schedule.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.schedule.AutoStopTask
+    annotation: '@Component'
+  - name: cn.javastack.springboot.schedule.CustomTaskScheduler
+    annotation: '@Component'
+  - name: cn.javastack.springboot.schedule.SimpleTask
+    annotation: '@Component'
+  - name: cn.javastack.springboot.schedule.TaskConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.session.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.session.webflux.IndexController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.session.webflux.LoginWebFilter
+    annotation: '@Component'
+  - name: cn.javastack.springboot.session.webmvc.IndexController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.session.webmvc.LoginInterceptor
+    annotation: '@Component'
+  - name: cn.javastack.springboot.session.webmvc.WebConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.starter.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.starter.sample.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.test.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.test.service.UserServiceImpl
+    annotation: '@Service'
+  - name: cn.javastack.springboot.test.UserController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.tinylog.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.web.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.web.config.SecurityConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.web.config.ServerConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.web.config.WebConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.web.controller.ErrorPageController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.web.controller.LoginController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.web.controller.ResponseBodyController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.web.handler.ErrorRegister
+    annotation: '@Component'
+  - name: cn.javastack.springboot.webflux.Application
+    annotation: '@SpringBootApplication'
+  - name: cn.javastack.springboot.webflux.config.RoutingConfiguration
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.webflux.config.WebConfig
+    annotation: '@Configuration'
+  - name: cn.javastack.springboot.webflux.controller.IndexController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.webflux.controller.ResponseBodyController
+    annotation: '@RestController'
+  - name: cn.javastack.springboot.webflux.controller.TestController
+    annotation: '@Controller'
+  - name: cn.javastack.springboot.webflux.filter.TestWebFilter
+    annotation: '@Component'
+  - name: cn.javastack.springboot.webflux.server.CustomWebServerFactoryCustomizer
+    annotation: '@Component'
+  - name: cn.javastack.springboot.webflux.service.handler.UserHandler
+    annotation: '@Component'
+
+# TASKBOOK §03 要求：核心依赖关系
+# 全部来自人工阅读源码确认（含一条跨模块边：starter-sample → starter）。
+coreDependencies:
+  - from: cn.javastack.springboot.starter.sample.Application
+    to: cn.javastack.springboot.starter.service.TestService
+  - from: cn.javastack.springboot.starter.config.TestServiceAutoConfiguration
+    to: cn.javastack.springboot.starter.service.TestService
+  - from: cn.javastack.springboot.mybatis.controller.UserController
+    to: cn.javastack.springboot.mybatis.mapper.UserMapper
+  - from: cn.javastack.springboot.mybatis.controller.UserController
+    to: cn.javastack.springboot.mybatis.entity.UserDO
+  - from: cn.javastack.springboot.jpa.controller.UserController
+    to: cn.javastack.springboot.jpa.repo.UserRepository
+  - from: cn.javastack.springboot.jpa.controller.UserController
+    to: cn.javastack.springboot.jpa.entity.UserDO
+
+# TASKBOOK §03 要求：任选 5 个类的功能描述
+# ⚠️ 以下描述由 AI 依源码草拟，**尚待人工确认** —— TASKBOOK 要求的是"手工标注"。
+classDescriptions:
+  - name: cn.javastack.springboot.quickstart.Application
+    description: 快速入门示例的应用入口，同时标注 @SpringBootApplication 与 @RestController，提供 /hello 端点直接返回字符串，是「最简 Spring Boot 应用」的教学范本。
+  - name: cn.javastack.springboot.mybatis.controller.UserController
+    description: MyBatis 模块的用户控制器（@RestController）。通过构造器注入 UserMapper，/user/info/{id} 按 id 查询用户并返回 UserDO 实体。
+  - name: cn.javastack.springboot.jpa.controller.UserController
+    description: JPA 模块的用户控制器（@RestController）。通过构造器注入继承 CrudRepository 的 UserRepository，按 id 查询用户并返回 UserDO 实体 —— 与 mybatis 模块同名类形成跨模块对照。
+  - name: cn.javastack.springboot.starter.config.TestServiceAutoConfiguration
+    description: 自定义 starter 的自动配置类（@AutoConfiguration），受 javastack.starter.enabled 属性开关控制，向容器注册 TestService Bean —— 展示 Spring Boot 3 自动装配新写法。
+  - name: cn.javastack.springboot.starter.service.TestService
+    description: 自定义 starter 提供的服务类，getServiceName() 返回固定名称；被 starter-sample 模块的 Application 以 @Bean 参数方式消费 —— 跨模块依赖的典型用例。

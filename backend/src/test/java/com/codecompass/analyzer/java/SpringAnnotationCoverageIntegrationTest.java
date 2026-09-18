@@ -68,7 +68,8 @@ class SpringAnnotationCoverageIntegrationTest {
     @ParameterizedTest(name = "覆盖率达标：{0}")
     @ValueSource(strings = {
             "golden/spring-petclinic.yaml",
-            "golden/spring-petclinic-microservices.yaml"})
+            "golden/spring-petclinic-microservices.yaml",
+            "golden/spring-boot-best-practice.yaml"})
     void coverageMeetsTarget(String goldenResource) {
         Map<String, Object> golden = loadGolden(goldenResource);
         String repositoryUrl = String.valueOf(golden.get("repository"));
@@ -108,7 +109,8 @@ class SpringAnnotationCoverageIntegrationTest {
     @ParameterizedTest(name = "入口类被识别为 entry：{0}")
     @ValueSource(strings = {
             "golden/spring-petclinic.yaml",
-            "golden/spring-petclinic-microservices.yaml"})
+            "golden/spring-petclinic-microservices.yaml",
+            "golden/spring-boot-best-practice.yaml"})
     void entryClassesAreIdentified(String goldenResource) {
         Map<String, Object> golden = loadGolden(goldenResource);
         String repositoryUrl = String.valueOf(golden.get("repository"));
@@ -133,7 +135,8 @@ class SpringAnnotationCoverageIntegrationTest {
     @ParameterizedTest(name = "核心依赖关系可解析为边：{0}")
     @ValueSource(strings = {
             "golden/spring-petclinic.yaml",
-            "golden/spring-petclinic-microservices.yaml"})
+            "golden/spring-petclinic-microservices.yaml",
+            "golden/spring-boot-best-practice.yaml"})
     void coreDependenciesBecomeEdges(String goldenResource) {
         Map<String, Object> golden = loadGolden(goldenResource);
         String repositoryUrl = String.valueOf(golden.get("repository"));

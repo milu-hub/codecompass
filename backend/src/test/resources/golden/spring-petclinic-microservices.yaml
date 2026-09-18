@@ -85,7 +85,7 @@ coreDependencies:
     to: org.springframework.samples.petclinic.customers.web.mapper.OwnerEntityMapper
 
 # TASKBOOK §03 要求：任选 5 个类的功能描述
-# ⚠️ 以下描述由 AI 依源码草拟，**尚待人工确认**。
+# ✅ 已人工确认（2026-09-18）
 classDescriptions:
   - name: org.springframework.samples.petclinic.api.ApiGatewayApplication
     description: API 网关模块的 Spring Boot 入口，启用服务发现，对外暴露统一入口并把请求路由到各微服务。

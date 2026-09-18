@@ -49,7 +49,7 @@ coreDependencies:
     to: org.springframework.samples.petclinic.vet.VetRepository
 
 # TASKBOOK §03 要求：任选 5 个类的功能描述
-# ⚠️ 以下描述由 AI 依源码草拟，**尚待人工确认** —— TASKBOOK 要求的是"手工标注"。
+# ✅ 已人工确认（2026-09-18）
 classDescriptions:
   - name: org.springframework.samples.petclinic.PetClinicApplication
     description: Spring Boot 应用入口，标注 @SpringBootApplication，main 方法启动整个 PetClinic 应用。
