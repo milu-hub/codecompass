@@ -2,6 +2,18 @@ spring:
   application:
     name: codecompass-backend
 
+  # T13：持久化。连接串从环境变量读（不硬编码）；缺省回落 H2（单元测试/无库开发）。
+  # 集成/生产：DB_URL=jdbc:mysql://127.0.0.1:3306/codecompass?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+  datasource:
+    url: ${DB_URL:jdbc:h2:mem:codecompass;MODE=MySQL;DB_CLOSE_DELAY=-1}
+    username: ${DB_USER:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      # schema 归 Flyway 管，Hibernate 不许动 —— 缺省 create-drop 会把迁移出的表清掉
+      ddl-auto: none
+    open-in-view: false
+
 server:
   port: 8080
 
