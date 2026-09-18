@@ -4,6 +4,27 @@ import type { AnalysisTaskView, GraphResponse, LearningPath, Quiz, QuizGrade, No
 
 export type TaskPhase = 'idle' | 'submitting' | 'pending' | 'running' | 'done' | 'failed'
 
+/**
+ * 成就「已读」标记的存储键。
+ *
+ * 身份本来就是浏览器级的匿名 Cookie（cc_client_id），所以「看过没看过」也放在
+ * 浏览器本地即可，不需要为此改后端。
+ */
+const SEEN_ACHIEVEMENTS_KEY = 'cc_seen_achievements'
+
+function loadSeenAchievements(): string[] {
+  try {
+    const raw = localStorage.getItem(SEEN_ACHIEVEMENTS_KEY)
+    const parsed: unknown = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed)
+      ? parsed.filter((code): code is string => typeof code === 'string')
+      : []
+  } catch {
+    // 隐私模式 / 脏数据：当作没看过，不影响主流程
+    return []
+  }
+}
+
 /** T14：源码里选中的标识符范围（提问的行锚点）。 */
 export interface SourceSelection {
   startLine: number
@@ -40,11 +61,23 @@ export const useRepositoryStore = defineStore('repository', {
     unitProgress: {} as Record<string, string>,
     notes: [] as NoteView[],
     achievements: [] as AchievementView[],
+    /** 已经「看过」的成就 code（点开成就入口即视为看过） */
+    seenAchievementCodes: loadSeenAchievements(),
     shareLink: null as ShareLink | null,
     pollingHandle: null as number | null,
     // 点击类的请求竞态令牌：晚到的旧响应必须丢弃
     unitRequestToken: 0,
   }),
+
+  getters: {
+    /** 顶部红点 = 已解锁但还没看过的成就数（看过就归零，红点随之消失）。 */
+    unseenAchievementCount(state): number {
+      return state.achievements.filter(
+        (achievement) =>
+          achievement.unlockedAt && !state.seenAchievementCodes.includes(achievement.code),
+      ).length
+    },
+  },
 
   actions: {
     stopPolling() {
@@ -216,6 +249,26 @@ export const useRepositoryStore = defineStore('repository', {
       )
       this.achievements = next
       return next.filter((a) => a.unlockedAt && !previouslyUnlocked.has(a.code))
+    },
+
+    /**
+     * 点开成就入口 = 已读：把当前已解锁的成就全部记为看过，顶部红点随之消失。
+     * 只增不减，并持久化到本地，刷新后不会把老成就又当成新解锁。
+     */
+    markAchievementsSeen() {
+      const unlocked = this.achievements
+        .filter((achievement) => achievement.unlockedAt)
+        .map((achievement) => achievement.code)
+      const merged = [...new Set([...this.seenAchievementCodes, ...unlocked])]
+      if (merged.length === this.seenAchievementCodes.length) {
+        return
+      }
+      this.seenAchievementCodes = merged
+      try {
+        localStorage.setItem(SEEN_ACHIEVEMENTS_KEY, JSON.stringify(merged))
+      } catch {
+        // 写不进去也不影响本次会话内红点消失
+      }
     },
 
     /** F6：生成分享短链。 */
