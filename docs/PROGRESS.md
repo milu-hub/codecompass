@@ -1,7 +1,7 @@
 # 进度
 
 ## 当前任务
-T22 F6 分享页前端（待用户指令，T19～T21 已全部完成并提交）
+T23 端到端验收
 
 ## 已完成
 计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 299 + 集成 28 = 327，全绿**。
@@ -192,3 +192,4 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - T19 F5 进度 + 成就：`ProgressEntity/Repository`（upsert、status 校验）、`AchievementService`（规则全配置 `codecompass.achievements.definitions[]`，user_actions 计数 ≥ threshold 解锁、refId 幂等）、`AchievementEntity/Repository`、`ProgressController`/`AchievementController`。触发点：analyze（status 首次观察到 done，不碰 F1 编排器）、ask、note、quiz_perfect、path_done（最新学习路线全步骤 done）。新增单元 8 + 集成 1（真机分析解锁 FIRST_REPO、进度持久化、FIRST_NOTE）
 - T20 F5 前端：类列表进度圆点、右侧笔记面板（upsert/删除/解锁提示）、顶部成就徽章（popover 全量定义 + 分析完成时刷新并弹解锁通知）。**实测抓到两个真 bug 并修复**：单元 id（含 filePath）超 128 字符 → V2 加宽 code_unit_id 到 512 且唯一索引缩为 (client_id, code_unit_id)（三列索引超 InnoDB 3072 字节上限，实测 1071）；user_actions.ref_id 同样超宽 → V3 加宽。真实浏览器走查：成就徽章 + 笔记保存全通
 - T21 F6 分享领读页后端：`ShareService`（快照 = 仓库信息 + 依赖图 mermaid + 学习路线 + 分享者自己前 10 条问答 + 已解锁成就 code/name，无源码无 API key 无他人笔记）、`ShareSnapshotEntity/Repository`（30 天过期可配）、`ShareController`（POST 生成短链 / GET /share/{id} 独立 HTML + Mermaid CDN + UTF-8，过期 404「已过期」）。**前置补齐 qa_history 表（V4）**：ask 成功后旁路记录（失败不打断问答）。新增单元 6 + 集成 1（真机短链无 Cookie 打开、含依赖图、脱敏）
+- T22 F6 分享页前端：结果区「生成分享页」按钮 + 短链弹窗（复制/打开）；分享页本体是后端渲染 HTML（FEATURE_SPEC 明确不复用 SPA）。**补齐 Vite `/share` 代理**（dev 下短链走 :5173，不代理会 404 —— 与 T8 补 /api 代理同款）。真机走查：弹窗短链可用，分享页 200 且含依赖图/学习路线/问答/页脚、不含源码
