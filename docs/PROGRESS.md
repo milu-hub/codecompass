@@ -42,6 +42,7 @@ Python 解析器（P1–P8）与前端收尾（Python 高亮档案 P6 + 分享�
 ## 前端美化收尾（design-taste，第 7 步）
 - 分享页学习路线重排（`ShareController.render` → `renderLearningPath`）：三段式（28px 主色圆号 + 类名 15px 粗 + 右侧分钟 / 第二行 reason 13px 灰）、24px 步距无分隔线无卡片底、默认只展 8 步 +「展开全部」（hidden 切换）、`<768px` 分钟贴类名、类名不伪造链接（快照不含源码）。`ShareControllerTest` 新增 1 单元；CDP 计算样式走查 10/10 符合规格（截图 `docs/screenshots/45-分享页学习路线.png`）
 - **窄屏复验抓到的真问题**：分享页原本没有 `<meta name="viewport">` —— 移动端浏览器会把布局视口当默认 **980px**，`max-width:767px` 媒体查询在真机上**永不命中**（窄屏规则等于白写）。补 `HEAD_META` 常量（charset + viewport）供 `render()` / `simplePage()` 共用，并加断言钉住。CDP 真机模拟（`mobile:true` + 400px）复验：布局视口 400px、`flex:0 1 auto`、分钟紧贴类名（间距 12px）
+- **Mermaid CDN 阻塞修复**：`<head>` 里的 mermaid CDN 脚本原本是同步 script，**阻塞 HTML 解析** —— CDN 慢/卡死时整页白屏（body 都解析不出来）。改为 `defer` 加载，并把初始化移进 `DOMContentLoaded` + `window.mermaid` 存在性守卫。CDP A/B 实测（`Fetch` 域把 CDN 请求挂住不响应，模拟 CDN 卡死而非快速失败）：**修复前** `readyState=loading`、body 长度 -1、渲染 0 步；**修复后** `readyState=interactive`、10 步全渲染、展开按钮可用、0 JS 异常
 
 ## 本地运行（已实测通过）
 ```bash

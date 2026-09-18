@@ -164,7 +164,7 @@ public class ShareController {
 
         String html = "<!DOCTYPE html><html><head>" + HEAD_META
                 + "<title>CodeCompass 分享</title>"
-                + "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
+                + "<script defer src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
                 + "<style>"
                 + "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;"
                 + "color:#1f2a27;max-width:900px;margin:24px auto;padding:0 16px;line-height:1.6;}"
@@ -192,7 +192,8 @@ public class ShareController {
                 + "</style></head><body>"
                 + body
                 + "<footer>由 CodeCompass 生成</footer>"
-                + "<script>mermaid.initialize({startOnLoad:true});</script>"
+                + "<script>document.addEventListener('DOMContentLoaded',function(){"
+                + "if(window.mermaid){mermaid.initialize({startOnLoad:true});}});</script>"
                 + "<script>(function(){var b=document.getElementById('path-toggle');if(!b)return;"
                 + "b.addEventListener('click',function(){var e=b.getAttribute('data-expanded')!=='1';"
                 + "var s=document.querySelectorAll('.path-step--extra');"

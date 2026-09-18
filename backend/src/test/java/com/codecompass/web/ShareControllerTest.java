@@ -122,6 +122,10 @@ class ShareControllerTest {
 
         assertThat(html).contains("mermaid", "A --&gt; B", "由 CodeCompass 生成");
         assertThat(html).contains("笔记", "OwnerController", "入口类先读");
+        // mermaid CDN 脚本必须非阻塞加载（defer）—— 否则 CDN 慢/挂掉时整页停在白屏
+        assertThat(html).contains("<script defer src=\"https://cdn.jsdelivr.net/npm/mermaid");
+        // CDN 挂掉时初始化不能抛错，必须有存在性守卫
+        assertThat(html).contains("window.mermaid");
     }
 
     @Test
