@@ -201,6 +201,125 @@ body {
   box-shadow: 0 0 0 1px var(--cc-accent) inset;
 }
 
+/* ==========================================================================
+   第五步：按钮
+   --------------------------------------------------------------------------
+   三档，覆盖全站所有 el-button 变体：
+     1) 主按钮（type="primary" 实心）  主色渐变 + 柔和主色投影 + 悬停抬升 1px
+     2) 次按钮（默认实心）             毛玻璃（与第二/四步的材质一致）
+     3) 文字按钮（is-text）            常态用中性色（对比度 4.7:1），悬停转主色
+        —— 主色小字只有 3.0:1，不达 AA，所以常态不用主色
+     4) 危险文字按钮（type="danger" text）保留语义红，不并入主色
+   圆角统一按「交互控件 8px」；焦点环改成主色，保证键盘可达时看得见。
+   ========================================================================== */
+
+.el-button {
+  --el-button-outline-color: rgba(12, 166, 120, 0.5);
+  border-radius: var(--cc-radius-row);
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+/* ---------- 1) 主按钮：渐变 ---------- */
+.el-button--primary:not(.is-text):not(.is-link):not(.is-plain) {
+  /* EP 的底色/描边交给渐变自己画，否则会在渐变下面垫一层纯色 */
+  --el-button-bg-color: transparent;
+  --el-button-border-color: transparent;
+  --el-button-hover-bg-color: transparent;
+  --el-button-hover-border-color: transparent;
+  --el-button-active-bg-color: transparent;
+  --el-button-active-border-color: transparent;
+  background-image: linear-gradient(135deg, #12b886, #0ca678);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(12, 166, 120, 0.25);
+}
+
+.el-button--primary:not(.is-text):not(.is-link):not(.is-plain):hover:not(.is-disabled) {
+  background-image: linear-gradient(135deg, #15c793, #0fb27f);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(12, 166, 120, 0.32);
+  transform: translateY(-1px);
+}
+
+.el-button--primary:not(.is-text):not(.is-link):not(.is-plain):active:not(.is-disabled) {
+  box-shadow: 0 3px 8px rgba(12, 166, 120, 0.28);
+  transform: translateY(0);
+}
+
+/* 禁用态：渐变仍在，但整体压暗且不再抬升，避免看起来像可点。
+   选择器必须写到和基础规则同等特异度，否则 box-shadow: none 会被基础规则压掉。 */
+.el-button--primary.is-disabled:not(.is-text):not(.is-link),
+.el-button--primary.is-disabled:not(.is-text):not(.is-link):hover {
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ---------- 2) 次按钮：毛玻璃 ---------- */
+.el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.is-text):not(.is-link):not(.is-plain) {
+  background: rgba(255, 255, 255, 0.7);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-color: rgba(220, 230, 225, 0.8);
+  color: var(--cc-ink);
+}
+
+.el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.is-text):not(.is-link):not(.is-plain):hover:not(.is-disabled) {
+  /* 必须显式写 color：EP 的 hover 会把文字染成主色蓝 */
+  color: var(--cc-ink);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--cc-text-faint);
+}
+
+.el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.is-text):not(.is-link):not(.is-plain):active:not(.is-disabled) {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--cc-accent);
+}
+
+/* ---------- 3) 文字按钮 ---------- */
+.el-button.is-text {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.el-button.is-text:not(.el-button--danger) {
+  /* 常态中性色（4.7:1 AA）；主色小字只有 3.0:1，留给悬停这种瞬时态 */
+  color: var(--cc-text-muted);
+}
+
+.el-button.is-text:not(.el-button--danger):hover {
+  color: var(--cc-accent);
+  background: var(--cc-accent-tint);
+}
+
+/* ---------- 4) 危险文字按钮：保留语义红 ---------- */
+.el-button.is-text.el-button--danger {
+  color: var(--el-color-danger);
+}
+
+.el-button.is-text.el-button--danger:hover {
+  background: rgba(245, 108, 108, 0.1);
+  color: var(--el-color-danger);
+}
+
+/* 尊重「减弱动效」：抬升关掉，保留颜色/投影反馈。
+   选择器必须写到和上面的 hover 规则同等特异度（否则 0-3-0 压不过 0-6-0，位移依然生效） */
+@media (prefers-reduced-motion: reduce) {
+  .el-button {
+    transition: none;
+  }
+
+  .el-button--primary:not(.is-text):not(.is-link):not(.is-plain):hover:not(.is-disabled) {
+    transform: none;
+  }
+}
+
 /* 可访问性回退：系统「降低透明度」时全部退化为实底，不牺牲对比度 */
 @media (prefers-reduced-transparency: reduce) {
   .cc-glass-bar {
@@ -219,6 +338,13 @@ body {
   .cc-glass-strong,
   .cc-glass-tabs > .el-tabs__header,
   .cc-glass-input .el-input__wrapper {
+    background: #ffffff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* 次按钮的毛玻璃走的是 .el-button 选择器，不在上面的 .cc-glass-* 里，这里单列一条 */
+  .el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.is-text):not(.is-link):not(.is-plain) {
     background: #ffffff;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
