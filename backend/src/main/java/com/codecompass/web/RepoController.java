@@ -18,10 +18,12 @@ import com.codecompass.analyzer.CodeUnitInfo;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.DependencyGraphBuilder;
 import com.codecompass.repo.GitRepositoryCloner;
+import com.codecompass.service.AchievementService;
 import com.codecompass.service.AnswerService;
 import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
+import com.codecompass.service.ClientIdentityHolder;
 import com.codecompass.service.LlmException;
 import com.codecompass.service.RateLimitExceededException;
 import com.codecompass.web.dto.AnalysisTaskView;
@@ -51,17 +53,20 @@ public class RepoController {
     private final AnalysisTaskStore store;
     private final DependencyGraphBuilder graphBuilder;
     private final AnswerService answerService;
+    private final AchievementService achievementService;
 
     public RepoController(GitRepositoryCloner cloner,
                           AnalysisOrchestrator orchestrator,
                           AnalysisTaskStore store,
                           DependencyGraphBuilder graphBuilder,
-                          AnswerService answerService) {
+                          AnswerService answerService,
+                          AchievementService achievementService) {
         this.cloner = cloner;
         this.orchestrator = orchestrator;
         this.store = store;
         this.graphBuilder = graphBuilder;
         this.answerService = answerService;
+        this.achievementService = achievementService;
     }
 
     @PostMapping
@@ -80,7 +85,17 @@ public class RepoController {
     @GetMapping("/{taskId}/status")
     public ResponseEntity<?> status(@PathVariable String taskId) {
         return store.find(taskId)
-                .<ResponseEntity<?>>map(snapshot -> ResponseEntity.ok(AnalysisTaskView.from(snapshot)))
+                .<ResponseEntity<?>>map(snapshot -> {
+                    // T19 触发点：客户端首次观察到 done = 「分析成功后」（异步管线不带身份，
+                    // 由轮询方身份记录；refId=taskId 幂等）
+                    if (AnalysisTaskSnapshot.STATUS_DONE.equals(snapshot.status())) {
+                        String clientId = ClientIdentityHolder.get();
+                        if (clientId != null) {
+                            achievementService.record(clientId, "analyze", snapshot.url(), taskId);
+                        }
+                    }
+                    return ResponseEntity.ok(AnalysisTaskView.from(snapshot));
+                })
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(new ErrorResponse("任务不存在")));
     }
@@ -174,11 +189,19 @@ public class RepoController {
         }
         try {
             String clientKey = resolveClientKey(servletRequest);
+            ResponseEntity<?> response;
             if (request.anchorStartLine() != null) {
-                return ResponseEntity.ok(answerService.ask(snapshot, question, unitId,
+                response = ResponseEntity.ok(answerService.ask(snapshot, question, unitId,
                         request.anchorStartLine(), request.anchorEndLine(), clientKey));
+            } else {
+                response = ResponseEntity.ok(answerService.ask(snapshot, question, unitId, clientKey));
             }
-            return ResponseEntity.ok(answerService.ask(snapshot, question, unitId, clientKey));
+            // T19 触发点：提问成功后计数（TEN_QUESTIONS）
+            String clientId = ClientIdentityHolder.get();
+            if (clientId != null) {
+                achievementService.record(clientId, "ask", snapshot.url(), null);
+            }
+            return response;
         } catch (RateLimitExceededException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(new ErrorResponse(e.getMessage()));

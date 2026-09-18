@@ -51,7 +51,8 @@ class IdentityNoteControllerTest {
         ClientIdentityHolder.set("client-1");
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new MeController(identityService),
-                new NoteController(noteRepository, clock)).build();
+                new NoteController(noteRepository,
+                        Mockito.mock(com.codecompass.service.AchievementService.class), clock)).build();
     }
 
     @AfterEach

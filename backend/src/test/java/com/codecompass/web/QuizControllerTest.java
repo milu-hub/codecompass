@@ -47,7 +47,9 @@ class QuizControllerTest {
         llmClient = Mockito.mock(LlmClient.class);
         QuizService service = new QuizService(llmClient, JsonMapper.builder().build());
         mockMvc = MockMvcBuilders.standaloneSetup(new QuizController(
-                store, service, repository, JsonMapper.builder().build())).build();
+                store, service, repository,
+                Mockito.mock(com.codecompass.service.AchievementService.class),
+                JsonMapper.builder().build())).build();
     }
 
     private String doneTaskId() {

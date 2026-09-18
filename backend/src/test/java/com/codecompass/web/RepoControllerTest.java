@@ -83,7 +83,8 @@ class RepoControllerTest {
                 cloner, orchestrator, store,
                 new com.codecompass.graph.DependencyGraphBuilder(
                         new com.codecompass.graph.MermaidRenderer()),
-                answerService)).build();
+                answerService,
+                Mockito.mock(com.codecompass.service.AchievementService.class))).build();
     }
 
     // ---------- POST /api/repos ----------
@@ -392,7 +393,8 @@ class RepoControllerTest {
                 cloner, Mockito.mock(AnalysisOrchestrator.class), store,
                 new com.codecompass.graph.DependencyGraphBuilder(
                         new com.codecompass.graph.MermaidRenderer()),
-                answerService)).build();
+                answerService,
+                Mockito.mock(com.codecompass.service.AchievementService.class))).build();
     }
 
     private String doneTaskId() {

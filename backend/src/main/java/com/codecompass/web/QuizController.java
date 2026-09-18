@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.codecompass.persistence.QuizEntity;
 import com.codecompass.persistence.QuizRepository;
+import com.codecompass.service.AchievementService;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
+import com.codecompass.service.ClientIdentityHolder;
 import com.codecompass.service.LlmException;
 import com.codecompass.service.Quiz;
 import com.codecompass.service.QuizService;
@@ -33,13 +35,16 @@ public class QuizController {
     private final AnalysisTaskStore store;
     private final QuizService service;
     private final QuizRepository repository;
+    private final AchievementService achievementService;
     private final JsonMapper jsonMapper;
 
     public QuizController(AnalysisTaskStore store, QuizService service,
-                          QuizRepository repository, JsonMapper jsonMapper) {
+                          QuizRepository repository, AchievementService achievementService,
+                          JsonMapper jsonMapper) {
         this.store = store;
         this.service = service;
         this.repository = repository;
+        this.achievementService = achievementService;
         this.jsonMapper = jsonMapper;
     }
 
@@ -83,6 +88,11 @@ public class QuizController {
                         .map(answer -> new QuizService.AnswerSubmission(answer.questionId(), answer.answerIndex()))
                         .toList();
         QuizService.GradeResult grade = service.grade(quiz, answers);
+        // T19 触发点：QUIZ_MASTER（100% 正确率；refId=quizId 幂等）
+        String clientId = ClientIdentityHolder.get();
+        if (clientId != null && grade.total() > 0 && grade.accuracy() == 1.0) {
+            achievementService.record(clientId, "quiz_perfect", entity.getRepoUrl(), quizId);
+        }
         return ResponseEntity.ok(new QuizGradeView(grade.correct(), grade.total(), grade.accuracy()));
     }
 

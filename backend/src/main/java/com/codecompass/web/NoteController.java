@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.codecompass.persistence.NoteEntity;
 import com.codecompass.persistence.NoteRepository;
+import com.codecompass.service.AchievementService;
 import com.codecompass.service.ClientIdentityHolder;
 import com.codecompass.service.Note;
 import com.codecompass.web.dto.ErrorResponse;
@@ -27,10 +28,12 @@ import com.codecompass.web.dto.NoteRequest;
 public class NoteController {
 
     private final NoteRepository repository;
+    private final AchievementService achievementService;
     private final Clock clock;
 
-    public NoteController(NoteRepository repository, Clock clock) {
+    public NoteController(NoteRepository repository, AchievementService achievementService, Clock clock) {
         this.repository = repository;
+        this.achievementService = achievementService;
         this.clock = clock;
     }
 
@@ -67,6 +70,8 @@ public class NoteController {
                 .orElseGet(() -> new NoteEntity(clientId, request.repoUrl(), request.codeUnitId(),
                         request.content(), now, now));
         repository.save(note);
+        // T19 触发点：FIRST_NOTE（refId=codeUnitId，同单元反复编辑不重复计数）
+        achievementService.record(clientId, "note", request.repoUrl(), request.codeUnitId());
         return ResponseEntity.ok(toNote(note));
     }
 

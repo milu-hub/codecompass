@@ -121,3 +121,32 @@ codecompass:
   rate-limit:
     # 按匿名身份（X-Client-Id → X-Forwarded-For → IP）的自然日 token 上限
     daily-token-limit: 100000
+
+  # T19：成就规则全部在配置里（服务端按 user_actions 计数判定，>= threshold 解锁）
+  achievements:
+    definitions:
+      - code: FIRST_REPO
+        name: 初次探索
+        description: 完成第一个仓库分析
+        action: analyze
+        threshold: 1
+      - code: FIRST_NOTE
+        name: 第一笔笔记
+        description: 写下第一条笔记
+        action: note
+        threshold: 1
+      - code: TEN_QUESTIONS
+        name: 刨根问底
+        description: 提问 10 次
+        action: ask
+        threshold: 10
+      - code: QUIZ_MASTER
+        name: 满分学霸
+        description: 一次测验正确率 100%
+        action: quiz_perfect
+        threshold: 1
+      - code: PATH_FINISHED
+        name: 善始善终
+        description: 完成一条学习路线
+        action: path_done
+        threshold: 1
