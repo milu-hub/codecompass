@@ -79,10 +79,17 @@
 }
 
 /** 拖拽分栏期间：全局禁选 + 统一光标（否则鼠标划过文字会变 I-beam、还会选中文本） */
-body.cc-resizing,
-body.cc-resizing * {
+body.cc-resizing-col,
+body.cc-resizing-col * {
   user-select: none;
   cursor: col-resize;
+}
+
+/** 拖拽上下分区期间：横向分隔条对应 row-resize */
+body.cc-resizing-row,
+body.cc-resizing-row * {
+  user-select: none;
+  cursor: row-resize;
 }
 
 /** 窄屏：三栏纵向堆叠，外壳交回内容高度（每栏各占一屏） */

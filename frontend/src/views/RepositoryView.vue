@@ -11,11 +11,11 @@ import LearningPathPanel from '../components/LearningPathPanel.vue'
 import QuizPanel from '../components/QuizPanel.vue'
 import NotePanel from '../components/NotePanel.vue'
 import AchievementsPanel from '../components/AchievementsPanel.vue'
-import { useColumnLayout } from '../composables/useColumnLayout'
+import { useResizableLayout } from '../composables/useResizableLayout'
 
-/** 三栏可拖拽布局：宽度存 CSS 变量（拖拽时不重建 DOM），比例落 localStorage */
-const gridRef = ref<HTMLElement | null>(null)
-const { containerStyle, draggingBoundary, startDrag, resetColumns } = useColumnLayout(gridRef)
+/** 工作台布局：左右分栏 + 上下分区，两个方向都可拖，比例落 localStorage */
+const layoutRef = ref<HTMLElement | null>(null)
+const { layoutStyle, draggingAxis, startDrag, resetLayout } = useResizableLayout(layoutRef)
 
 const repository = useRepositoryStore()
 const {
@@ -140,51 +140,53 @@ async function onSubmit() {
       show-icon
     />
 
-    <!-- 结果区：三栏主区（CSS Grid + CSS 变量宽），中间两条可拖拽分隔条 -->
+    <!-- 结果区：上区「类列表 + 源码」占一行（左右可拖），下区「图/Tab」独占整行（上下可拖） -->
     <div
       v-if="phase === 'done' && graph"
-      ref="gridRef"
+      ref="layoutRef"
       class="result-layout"
-      :style="containerStyle"
+      :style="layoutStyle"
     >
-      <div class="list-pane cc-glass-card" data-pane="left">
-        <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
-        <ClassList
-          :units="graph.codeUnits"
-          :selected-id="selectedUnitId"
-          :filter-text="filterText"
-          :progress="repository.unitProgress"
-          @select="(id: string) => void repository.selectUnit(id)"
-        />
+      <div class="workbench-top" data-pane="top">
+        <div class="list-pane cc-glass-card" data-pane="left">
+          <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
+          <ClassList
+            :units="graph.codeUnits"
+            :selected-id="selectedUnitId"
+            :filter-text="filterText"
+            :progress="repository.unitProgress"
+            @select="(id: string) => void repository.selectUnit(id)"
+          />
+        </div>
+
+        <div
+          class="splitter splitter--col"
+          :class="{ 'is-dragging': draggingAxis === 'columns' }"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="拖拽调整类列表宽度"
+          @pointerdown="startDrag('columns', $event)"
+        ></div>
+
+        <div class="source-pane cc-glass-card" data-pane="middle">
+          <!-- T14：选中类源码（点行选中标识符） -->
+          <SourcePane />
+          <!-- F3：AI 问答（点类提问 + 选中标识符行锚点） -->
+          <QaPanel />
+        </div>
       </div>
 
       <div
-        class="splitter"
-        :class="{ 'is-dragging': draggingBoundary === 0 }"
+        class="splitter splitter--row"
+        :class="{ 'is-dragging': draggingAxis === 'rows' }"
         role="separator"
-        aria-orientation="vertical"
-        aria-label="拖拽调整类列表宽度"
-        @pointerdown="startDrag(0, $event)"
+        aria-orientation="horizontal"
+        aria-label="拖拽调整上下分区高度"
+        @pointerdown="startDrag('rows', $event)"
       ></div>
 
-      <div class="source-pane cc-glass-card" data-pane="middle">
-        <!-- T14：选中类源码（点行选中标识符） -->
-        <SourcePane />
-        <!-- F3：AI 问答（点类提问 + 选中标识符行锚点） -->
-        <QaPanel />
-      </div>
-
-      <div
-        class="splitter"
-        :class="{ 'is-dragging': draggingBoundary === 1 }"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="拖拽调整信息栏宽度"
-        @pointerdown="startDrag(1, $event)"
-      ></div>
-
-      <!-- T24：右栏统一 Tab —— 图 / 学习路线 / 测验 / 笔记 / 成就 -->
-      <div class="right-pane cc-glass-card" data-pane="right">
+      <!-- T24：下区统一 Tab —— 图 / 学习路线 / 测验 / 笔记 / 成就 -->
+      <div class="right-pane cc-glass-card" data-pane="bottom">
         <el-tabs v-model="rightTab" class="cc-glass-tabs">
           <el-tab-pane label="依赖图" name="graph">
             <div class="graph-header">
@@ -226,7 +228,7 @@ async function onSubmit() {
     type="button"
     title="重置布局"
     aria-label="重置布局"
-    @click="resetColumns"
+    @click="resetLayout"
   >
     <svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true">
       <path
@@ -337,27 +339,33 @@ async function onSubmit() {
   margin-top: 16px;
 }
 
-/* 三栏主区：CSS Grid + CSS 变量。拖拽只改 --w-* 三个变量，不重建 DOM、不动组件状态。
-   三条轨道都按「容器宽 - 两条分隔条」取比例 —— 否则三栏加起来比容器宽，右栏会被挤出视口。 */
+/* 工作台：上下两区，两个方向都靠 CSS 变量拖拽（不重建 DOM、不动组件状态）
+   - 上区高度 = (容器高 - 分隔条) × --h-top，下区吃掉剩余
+   - 上区内左右宽度 = (上区宽 - 分隔条) × --w-left / --w-middle
+   比例之和恒为 1，所以不会出现裂缝或被顶出边界。 */
 .result-layout {
   --cc-splitter: 6px;
-  display: grid;
-  grid-template-columns:
-    calc((100% - 2 * var(--cc-splitter)) * var(--w-left, 0.22))
-    var(--cc-splitter)
-    calc((100% - 2 * var(--cc-splitter)) * var(--w-middle, 0.44))
-    var(--cc-splitter)
-    calc((100% - 2 * var(--cc-splitter)) * var(--w-right, 0.34));
-  align-items: stretch;
-  /* 单行显式 minmax(0, 1fr)：杜绝行高被内容 max-content 撑开 */
-  grid-template-rows: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   flex: 1;
   margin-top: 16px;
-  /* 小窗口下宁可整页滚，也不把三栏压扁 */
+  /* 小窗口下宁可整页滚，也不把两区压扁 */
   min-height: 480px;
 }
 
-/* 三栏各自成一张玻璃卡片，高度撑满主区，内部各自滚动 */
+.workbench-top {
+  display: grid;
+  grid-template-columns:
+    calc((100% - var(--cc-splitter)) * var(--w-left, 0.26))
+    var(--cc-splitter)
+    calc((100% - var(--cc-splitter)) * var(--w-middle, 0.74));
+  /* 显式 minmax(0, 1fr)：杜绝行高被内容 max-content 撑开 */
+  grid-template-rows: minmax(0, 1fr);
+  flex: 0 0 calc((100% - var(--cc-splitter)) * var(--h-top, 0.68));
+  min-height: 0;
+}
+
+/* 两区各自成一张玻璃卡片，高度撑满自己那块，内部各自滚动 */
 .list-pane,
 .source-pane,
 .right-pane {
@@ -369,10 +377,14 @@ async function onSubmit() {
   overflow: hidden;
 }
 
-/* 分隔条：6px 透明，悬停/拖拽时亮一条主色竖线 */
+/* 下区独占整行，吃掉上区与分隔条之外的剩余高度 */
+.right-pane {
+  flex: 1 1 0;
+}
+
+/* 分隔条：透明，悬停/拖拽时亮一条主色线 */
 .splitter {
   position: relative;
-  cursor: col-resize;
   background: transparent;
   /* 触屏拖动时不要顺手滚动页面 */
   touch-action: none;
@@ -381,15 +393,37 @@ async function onSubmit() {
 .splitter::after {
   content: '';
   position: absolute;
+  border-radius: 1px;
+  background: var(--cc-accent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* 左右分栏用竖向分隔条 */
+.splitter--col {
+  cursor: col-resize;
+}
+
+.splitter--col::after {
   top: 0;
   bottom: 0;
   left: 50%;
   width: 2px;
   transform: translateX(-50%);
-  border-radius: 1px;
-  background: var(--cc-accent);
-  opacity: 0;
-  transition: opacity 0.12s ease;
+}
+
+/* 上下分区用横向分隔条 */
+.splitter--row {
+  flex: 0 0 var(--cc-splitter);
+  cursor: row-resize;
+}
+
+.splitter--row::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
 }
 
 .splitter:hover::after,
@@ -426,15 +460,19 @@ async function onSubmit() {
   border-color: var(--cc-accent);
 }
 
-/* 窄屏（<900px）：不启用拖拽，三栏纵向堆叠，每栏各占一屏 */
+/* 窄屏（<900px）：不启用拖拽，三块纵向堆叠，每块各占一屏 */
 @media (max-width: 899px) {
   .result-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    /* 堆叠后高度由三栏自己决定，别被外壳的 100dvh 挤压 */
     flex: 0 0 auto;
     min-height: 0;
+  }
+
+  .workbench-top {
+    display: flex;
+    flex-direction: column;
+    /* 堆叠后高度由各块自己决定，别被外壳的 100dvh 挤压 */
+    flex: 0 0 auto;
+    gap: 16px;
   }
 
   .splitter {
@@ -444,7 +482,9 @@ async function onSubmit() {
   .list-pane,
   .source-pane,
   .right-pane {
-    flex-shrink: 0;
+    /* 必须 flex: none：桌面规则里下区是 flex: 1 1 0，flex-basis: 0 会盖掉这里的 height，
+       实测下区只剩 min-height 420（别家 730） */
+    flex: 0 0 auto;
     height: calc(100dvh - 170px);
     min-height: 420px;
   }
