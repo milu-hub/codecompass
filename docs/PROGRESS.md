@@ -169,3 +169,5 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：**踩坑 —— PowerShell 5.1 的 Get-Content/Set-Content 默认按系统 GBK 读写，会把 UTF-8 测试源码的中文整批变成乱码**。教训：改含中文的源文件一律用 edit/write 工具，绝不在 PowerShell 里做文本回写（本次已用 write 全量重写恢复，未造成提交污染）
 - 2026-09-18：**T13 LlmConfig 模型**：`default` 是 Java 保留字 → 字段名 `isDefault`；provider 是元数据标签不参与路由（协议统一 OpenAI 兼容）；apiKey 明文只限服务内部使用，日志/异常禁打印 config 对象，未来对外端点必须脱敏
 - 2026-09-18：**T13 switch/save/delete 显式抛 UnsupportedOperationException**（「配置以 application.yml 为准」）——客户端是启动时用默认配置构建的单例，假装支持运行时切换会交付悄悄失效的功能；真切换需要「客户端按请求解析配置」，留给未来多配置版本。问答链路（AnswerService/LlmClient 接口/检索/校验/限流）零改动，唯一触碰点是客户端配置来源
+- 2026-09-18：**完整真实运行（全链路走查 + 全套测试）**：257 全绿（单元 236 + 集成 21，含真实 LLM 20 问、3 黄金样本、覆盖率 144/144）。经 Vite 代理走查：petclinic 25 单元/21 边、邻域 1 边、真实问答 2413ms 带 2 引用、**同问缓存命中 9ms（约 270 倍）答案逐字一致**、新问引用 94-122 即 processFindForm；第三样本 180 单元/80 边/0 失败文件，跨模块问答引用 CalcController+CalcService 正确
+- 2026-09-18：**环境坑 ×2**：① Vite 8 的 dev server 只绑 IPv6 `::1` —— `127.0.0.1:5173` 连不上、`localhost:5173` 正常，验收脚本一律用 localhost；② 昨天遗留的 Vite 僵尸进程占着 5173 且无响应（端口在监听、请求被拒），新实例被挤到 5174 —— 先清僵尸再重启才能回到标准端口
