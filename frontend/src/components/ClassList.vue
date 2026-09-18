@@ -75,8 +75,6 @@ const filtered = computed(() => {
 .class-list {
   max-height: 640px;
   overflow-y: auto;
-  /* hover 行有 translateX(2px)：不锁死横向，行右移 2px 会顶出横向滚动条 */
-  overflow-x: hidden;
 }
 
 .class-row {
@@ -89,14 +87,11 @@ const filtered = computed(() => {
   border-radius: var(--cc-radius-row);
   cursor: pointer;
   background: transparent;
-  transition:
-    background-color 0.16s ease,
-    transform 0.16s ease;
+  transition: background-color 0.16s ease;
 }
 
 .class-row:hover {
   background: var(--cc-accent-tint);
-  transform: translateX(2px);
 }
 
 .class-row.selected {
@@ -113,17 +108,6 @@ const filtered = computed(() => {
   width: 3px;
   border-radius: 2px;
   background: var(--cc-accent);
-}
-
-/* 尊重「减弱动效」：位移关掉，保留背景变化 */
-@media (prefers-reduced-motion: reduce) {
-  .class-row {
-    transition: background-color 0.16s ease;
-  }
-
-  .class-row:hover {
-    transform: none;
-  }
 }
 
 .class-name {
