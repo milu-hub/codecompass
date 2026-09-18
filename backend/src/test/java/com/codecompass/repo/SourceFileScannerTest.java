@@ -223,6 +223,106 @@ class SourceFileScannerTest {
         assertThat(found).hasSize(1);
     }
 
+    // ---------- P2：Python 整仓扫描 ----------
+
+    private SourceFileScanner pythonScanner() {
+        ScanProperties properties = new ScanProperties();
+        ScanProperties.SourceSpec python = new ScanProperties.SourceSpec();
+        python.setLanguage("python");
+        python.setSourceRoot(".");
+        python.setFileExtensions(List.of(".py"));
+        python.setExcludedFileNames(List.of());
+        python.setExcludedDirectoryNames(List.of(
+                "tests", "test", "venv", ".venv", "site-packages", "node_modules",
+                "__pycache__", ".tox", ".mypy_cache", ".pytest_cache", "build", "dist"));
+        properties.setSources(List.of(python));
+        return new SourceFileScanner(properties);
+    }
+
+    @Test
+    @DisplayName("P2 整仓模式：顶层 setup.py 与深层模块都收下，包名从仓库根起算")
+    void pythonWholeRepoMatchesAnyDepth() throws IOException {
+        write("setup.py");
+        write("app/models/user.py");
+        write("app/views/__init__.py");
+
+        List<CodeUnitFileInfo> found = pythonScanner().scan(repoRoot);
+
+        assertThat(found).extracting(CodeUnitFileInfo::relativePath)
+                .containsExactlyInAnyOrder("app/models/user.py", "app/views/__init__.py", "setup.py");
+        assertThat(found)
+                .filteredOn(info -> info.relativePath().equals("app/models/user.py"))
+                .singleElement()
+                .satisfies(info -> {
+                    assertThat(info.packageName()).isEqualTo("app.models");
+                    assertThat(info.unitName()).isEqualTo("user");
+                    assertThat(info.language()).isEqualTo("python");
+                });
+        assertThat(found)
+                .filteredOn(info -> info.relativePath().equals("setup.py"))
+                .singleElement()
+                .satisfies(info -> assertThat(info.packageName()).isEqualTo(""));
+    }
+
+    @Test
+    @DisplayName("P2 目录排除：tests/venv/.venv/node_modules/__pycache__ 全部跳过")
+    void pythonSkipsExcludedDirectories() throws IOException {
+        write("tests/test_app.py");
+        write("venv/lib/site-packages/thirdparty.py");
+        write(".venv/lib/dep.py");
+        write("node_modules/pkg/index.py");
+        write("app/__pycache__/cached.py");
+        write("app/main.py");
+
+        List<CodeUnitFileInfo> found = pythonScanner().scan(repoRoot);
+
+        assertThat(found).extracting(CodeUnitFileInfo::relativePath)
+                .containsExactly("app/main.py");
+    }
+
+    @Test
+    @DisplayName("P2 混仓：Java 与 Python 各按自己的配置命中，互不干扰")
+    void mixedRepositoryScansEachLanguageByItsOwnConfig() throws IOException {
+        ScanProperties properties = new ScanProperties();
+        properties.setSources(List.of(javaSource(), pythonSourceSpec()));
+        SourceFileScanner mixed = new SourceFileScanner(properties);
+
+        write("src/main/java/org/foo/Bar.java");
+        write("src/main/java/org/foo/package-info.java"); // Java 的文件级排除
+        write("app/main.py");
+        write("setup.py");
+        write("tests/test_x.py"); // Python 的目录级排除
+
+        List<CodeUnitFileInfo> found = mixed.scan(repoRoot);
+
+        assertThat(found).extracting(CodeUnitFileInfo::language)
+                .containsExactlyInAnyOrder("java", "python", "python");
+        assertThat(found).extracting(CodeUnitFileInfo::relativePath)
+                .contains("src/main/java/org/foo/Bar.java", "app/main.py", "setup.py")
+                .doesNotContain("src/main/java/org/foo/package-info.java", "tests/test_x.py");
+    }
+
+    @Test
+    @DisplayName("P2 稀疏检出模式：source-root 为 . 时退化为全量检出 **")
+    void wholeRepoSourceRootYieldsFullCheckoutPattern() {
+        ScanProperties.SourceSpec python = pythonSourceSpec();
+
+        assertThat(python.sparseCheckoutPattern()).isEqualTo("**");
+        assertThat(javaSource().sparseCheckoutPattern()).isEqualTo("**/src/main/java/**");
+    }
+
+    private ScanProperties.SourceSpec pythonSourceSpec() {
+        ScanProperties.SourceSpec spec = new ScanProperties.SourceSpec();
+        spec.setLanguage("python");
+        spec.setSourceRoot(".");
+        spec.setFileExtensions(List.of(".py"));
+        spec.setExcludedFileNames(List.of());
+        spec.setExcludedDirectoryNames(List.of(
+                "tests", "test", "venv", ".venv", "site-packages", "node_modules",
+                "__pycache__", ".tox", ".mypy_cache", ".pytest_cache", "build", "dist"));
+        return spec;
+    }
+
     private void write(String relativePath) throws IOException {
         Path target = repoRoot.resolve(relativePath);
         Files.createDirectories(target.getParent());

@@ -11,6 +11,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +50,13 @@ public class SourceFileScanner {
             return List.of();
         }
 
+        // 目录级排除取所有语言的并集：一次遍历，某语言要排除的目录对其它语言一并跳过
+        // （对 Java 无害——tests/venv 之类本来就不会命中 src/main/java）。
+        Set<String> excludedDirectories = properties.getSources() == null ? Set.of()
+                : properties.getSources().stream()
+                        .flatMap(source -> source.getExcludedDirectoryNames().stream())
+                        .collect(Collectors.toUnmodifiableSet());
+
         List<CodeUnitFileInfo> found = new ArrayList<>();
         try {
             Files.walkFileTree(repositoryRoot, new SimpleFileVisitor<>() {
@@ -55,8 +64,10 @@ public class SourceFileScanner {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                     Path name = dir.getFileName();
-                    if (name != null && GIT_DIRECTORY.equals(name.toString())) {
-                        // 版本库内部没有源码，进去只是白翻几万个对象文件
+                    if (name != null
+                            && (GIT_DIRECTORY.equals(name.toString())
+                                    || excludedDirectories.contains(name.toString()))) {
+                        // 版本库内部没有源码；被排除的目录（tests/venv/node_modules…）同理
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;
@@ -89,9 +100,6 @@ public class SourceFileScanner {
 
     private Optional<CodeUnitFileInfo> match(String relativePath) {
         String[] segments = relativePath.split(SEPARATOR);
-        if (segments.length < 2) {
-            return Optional.empty();
-        }
         String fileName = segments[segments.length - 1];
         List<ScanProperties.SourceSpec> sources = properties.getSources();
         if (sources == null) {
@@ -104,6 +112,18 @@ public class SourceFileScanner {
                 continue;
             }
             if (source.getExcludedFileNames().contains(fileName)) {
+                continue;
+            }
+            // P2：整仓模式（source-root "."，Python 用）。包名从仓库根起算，无源码根约束，
+            // 因此顶层的 setup.py（segments.length == 1）也要收下。
+            if (source.isWholeRepo()) {
+                String packageName = segments.length >= 2
+                        ? String.join(".", Arrays.copyOfRange(segments, 0, segments.length - 1))
+                        : "";
+                return Optional.of(new CodeUnitFileInfo(
+                        relativePath, packageName, unitName, source.getLanguage()));
+            }
+            if (segments.length < 2) {
                 continue;
             }
             int packageStart = packageStartIndex(segments, source.getSourceRoot());

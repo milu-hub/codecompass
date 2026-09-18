@@ -34,6 +34,10 @@ public class ScanProperties {
         /**
          * 源码根，形如 {@code src/main/java} 的**路径片段序列**。
          * 出现在路径任意深度都算命中，且同时充当包名推导的基准。
+         *
+         * <p>特殊值 {@code "."} 表示**整仓**（P2 给 Python 用）：没有统一的源码根约定，
+         * 包名一律从仓库根起算；sparse-checkout 相应退化为全量检出（见
+         * {@link #sparseCheckoutPattern()}）。
          */
         private String sourceRoot;
 
@@ -43,13 +47,28 @@ public class ScanProperties {
         private List<String> excludedFileNames = new ArrayList<>();
 
         /**
+         * 目录名级排除（P2 给 Python 用），如 tests / venv / node_modules。
+         * 所有声明过该配置的语言共享同一份排除名单 —— 扫描是一次遍历，
+         * 某语言要排除的目录对其它语言一并跳过（对 Java 无害：这些目录本来就不会命中 src/main/java）。
+         */
+        private List<String> excludedDirectoryNames = new ArrayList<>();
+
+        /**
          * 供 T1 派生 git sparse-checkout 模式。
          *
          * 由 {@link #sourceRoot} 派生而不是各配一份，是为了避免"扫描范围"与"检出范围"漂移 ——
          * 两者一旦不一致，T2 会扫出空集合却不报错。
          */
         public String sparseCheckoutPattern() {
+            if (isWholeRepo()) {
+                return "**";
+            }
             return "**/" + sourceRoot + "/**";
+        }
+
+        /** source-root 为 "." 表示整仓（P2：Python 没有统一源码根约定）。 */
+        public boolean isWholeRepo() {
+            return ".".equals(sourceRoot);
         }
 
         public String getLanguage() {
@@ -82,6 +101,14 @@ public class ScanProperties {
 
         public void setExcludedFileNames(List<String> excludedFileNames) {
             this.excludedFileNames = excludedFileNames;
+        }
+
+        public List<String> getExcludedDirectoryNames() {
+            return excludedDirectoryNames;
+        }
+
+        public void setExcludedDirectoryNames(List<String> excludedDirectoryNames) {
+            this.excludedDirectoryNames = excludedDirectoryNames;
         }
     }
 }

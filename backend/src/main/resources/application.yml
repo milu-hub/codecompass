@@ -31,6 +31,16 @@ codecompass:
         file-extensions: ['.java']
         excluded-file-names: ['package-info.java', 'module-info.java']
 
+      - language: python
+        # P2：Python 项目没有统一的源码根约定，用 '.' 表示整仓扫描，
+        # 包名一律从仓库根起算；sparse-checkout 相应退化为全量检出（见 SourceSpec.isWholeRepo）。
+        # 目录级排除取所有语言的并集（tests/venv/node_modules 等对 Java 扫描无害）。
+        source-root: '.'
+        file-extensions: ['.py']
+        excluded-file-names: []
+        excluded-directory-names: [tests, test, venv, .venv, site-packages, node_modules,
+                                   __pycache__, .tox, .mypy_cache, .pytest_cache, build, dist]
+
   # Java 分析器配置。框架标记刻意放这里而不是硬编码在代码里（T5 要求「应可配置」）。
   # 注意：YAML 里 '@' 是保留指示符，标记必须加引号。
   analyze:
