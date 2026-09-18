@@ -106,8 +106,15 @@ public class ShareController {
 
     // ---------- HTML 渲染（后端独立页面，不复用 SPA） ----------
 
+    /**
+     * 分享页 head 公共前缀。**viewport 必须有** —— 缺了它移动端浏览器会把布局视口当成
+     * 默认 980px，`max-width:767px` 的媒体查询在真机上永远不命中（学习路线的窄屏规则等于白写）。
+     */
+    private static final String HEAD_META =
+            "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
+
     private static String simplePage(String title, String body) {
-        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>" + escape(title)
+        return "<!DOCTYPE html><html><head>" + HEAD_META + "<title>" + escape(title)
                 + "</title></head><body><h1>" + escape(title) + "</h1>" + body
                 + "<footer>由 CodeCompass 生成</footer></body></html>";
     }
@@ -155,7 +162,7 @@ public class ShareController {
         }
         body.append("</ul>");
 
-        String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+        String html = "<!DOCTYPE html><html><head>" + HEAD_META
                 + "<title>CodeCompass 分享</title>"
                 + "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
                 + "<style>"

@@ -153,6 +153,9 @@ class ShareControllerTest {
         assertThat(html).contains("path-step--extra", "hidden", "path-toggle", "展开全部");
         assertThat(html).contains("<span class=\"path-name\">Step1</span>");
         assertThat(html).doesNotContain("<a class=\"path-name\"");
+        // 窄屏规则要真机上生效必须有 viewport —— 否则布局视口退回 980px，媒体查询永不命中
+        assertThat(html).contains(
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
     }
 
     @Test
