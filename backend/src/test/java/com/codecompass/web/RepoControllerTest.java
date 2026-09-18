@@ -84,7 +84,8 @@ class RepoControllerTest {
                 new com.codecompass.graph.DependencyGraphBuilder(
                         new com.codecompass.graph.MermaidRenderer()),
                 answerService,
-                Mockito.mock(com.codecompass.service.AchievementService.class))).build();
+                Mockito.mock(com.codecompass.service.AchievementService.class),
+                Mockito.mock(com.codecompass.service.QaHistoryRecorder.class))).build();
     }
 
     // ---------- POST /api/repos ----------
@@ -394,7 +395,8 @@ class RepoControllerTest {
                 new com.codecompass.graph.DependencyGraphBuilder(
                         new com.codecompass.graph.MermaidRenderer()),
                 answerService,
-                Mockito.mock(com.codecompass.service.AchievementService.class))).build();
+                Mockito.mock(com.codecompass.service.AchievementService.class),
+                Mockito.mock(com.codecompass.service.QaHistoryRecorder.class))).build();
     }
 
     private String doneTaskId() {

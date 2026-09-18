@@ -150,3 +150,7 @@ codecompass:
         description: 完成一条学习路线
         action: path_done
         threshold: 1
+
+  # T21：分享快照过期天数
+  share:
+    expires-days: 30

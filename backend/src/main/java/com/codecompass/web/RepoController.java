@@ -21,12 +21,14 @@ import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.DependencyGraphBuilder;
 import com.codecompass.repo.GitRepositoryCloner;
 import com.codecompass.service.AchievementService;
+import com.codecompass.service.AnswerResponse;
 import com.codecompass.service.AnswerService;
 import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
 import com.codecompass.service.ClientIdentityHolder;
 import com.codecompass.service.LlmException;
+import com.codecompass.service.QaHistoryRecorder;
 import com.codecompass.service.RateLimitExceededException;
 import com.codecompass.web.dto.AnalysisTaskView;
 import com.codecompass.web.dto.AskRequest;
@@ -58,19 +60,22 @@ public class RepoController {
     private final DependencyGraphBuilder graphBuilder;
     private final AnswerService answerService;
     private final AchievementService achievementService;
+    private final QaHistoryRecorder qaHistoryRecorder;
 
     public RepoController(GitRepositoryCloner cloner,
                           AnalysisOrchestrator orchestrator,
                           AnalysisTaskStore store,
                           DependencyGraphBuilder graphBuilder,
                           AnswerService answerService,
-                          AchievementService achievementService) {
+                          AchievementService achievementService,
+                          QaHistoryRecorder qaHistoryRecorder) {
         this.cloner = cloner;
         this.orchestrator = orchestrator;
         this.store = store;
         this.graphBuilder = graphBuilder;
         this.answerService = answerService;
         this.achievementService = achievementService;
+        this.qaHistoryRecorder = qaHistoryRecorder;
     }
 
     @PostMapping
@@ -197,12 +202,12 @@ public class RepoController {
         }
         try {
             String clientKey = resolveClientKey(servletRequest);
-            ResponseEntity<?> response;
+            AnswerResponse answer;
             if (request.anchorStartLine() != null) {
-                response = ResponseEntity.ok(answerService.ask(snapshot, question, unitId,
-                        request.anchorStartLine(), request.anchorEndLine(), clientKey));
+                answer = answerService.ask(snapshot, question, unitId,
+                        request.anchorStartLine(), request.anchorEndLine(), clientKey);
             } else {
-                response = ResponseEntity.ok(answerService.ask(snapshot, question, unitId, clientKey));
+                answer = answerService.ask(snapshot, question, unitId, clientKey);
             }
             // T19 触发点：提问成功后计数（TEN_QUESTIONS）。记录失败不打断问答。
             String clientId = ClientIdentityHolder.get();
@@ -213,7 +218,10 @@ public class RepoController {
                     log.warn("成就记录失败（ask）：{}", e.getMessage());
                 }
             }
-            return response;
+            // T21：问答历史旁路记录（F6 分享快照「前 10 条问答」的数据来源）
+            qaHistoryRecorder.record(ClientIdentityHolder.get(), snapshot.url(),
+                    snapshot.outcome().commitSha(), question, answer);
+            return ResponseEntity.ok(answer);
         } catch (RateLimitExceededException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(new ErrorResponse(e.getMessage()));
