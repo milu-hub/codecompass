@@ -1,7 +1,7 @@
 # 进度
 
 ## 当前任务
-无 —— F2/F4/F5/F6 按 T13～T24 全部交付（验收见 `docs/T23-验收报告.md`）
+Python 解析器已交付（P1–P7，见下）；收尾中：前端 Python 高亮档案（P6）+ 分享页学习路线美化（第 7 步）。
 
 ## 已完成
 计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 306 + 集成 28 = 334，全绿**。
@@ -22,6 +22,20 @@
 - T12 端到端验收：`PythonStubAnalyzer`（唯一新增生产文件，业务层零改动）+ 三个验收测试 + `docs/T12-验收报告.md`。五项验收全过：黄金样本 2/2、覆盖率 35/35=100%、引用行号 20/20=100%、缓存命中 P95=0ms、多语言扩展点结构断言。新增单元 3 + 集成 1
 - T12 补测（用户补齐三处遗留）：**第三黄金样本** `javastacks/spring-boot-best-practice`（37 模块/179 文件，golden 独立脚本生成 109 注解类+39 入口+6 依赖含跨模块边，首跑全过 0 解析失败）；**真实 LLM 档**（DeepSeek deepseek-chat，key 仅走环境变量）：20 问抽样两次实测 95.0% / 100.0%（每问至少一条引用命中地面真值文件），52/50 条引用结构合法 100%；前两个样本的 5 类描述已人工确认（golden 改注）。新增集成 4（覆盖率参数化 +3、真实 LLM 验收 1）
 - T13 LLM 配置抽象（多配置预留）：`LlmConfig`（id/provider/baseUrl/apiKey/model/isDefault + configured()）、`LlmConfigService`（list/getDefault/switchDefault/save/delete）、`InMemoryLlmConfigService`（单配置、yml 种子、只读）。客户端配置来源 LlmProperties → LlmConfigService.getDefault()，问答逻辑零改动。新增单元 7
+
+## Python 解析器（P1–P7，设计见 `PYTHON_ANALYZER_PLAN.md`）
+
+> 这是「第一版不做」清单里「Java 以外的解析器」那条的正式放开：本期实现 **Python**，
+> Go/TypeScript 等仍只预留接口。边界同步见 `docs/AGENTS.md`（已改）与 `docs/TASKBOOK.md`（已划掉）。
+
+- P1 语法接入（`f59160d`）：ANTLR4 4.13.2 + grammars-v4 `python/python3_14` 语法（按 commit `20efa53` 钉死，MIT），构建期生成词法/语法器，`PythonSourceParser` 冒烟件（现代语法 / 缩进 / 错误逐条带行号）
+- P2 扫描与命名（`33ab833`）：整仓扫描（`source-root: '.'` + 目录排除表）、`PythonModuleNames`（模块/包名/限定名/单元 id 规则，与 Java 同构 `repo:路径#限定名`）
+- P3 结构抽取（`e63e177`）：`PythonAnalyzer` 替换 stub —— 类/模块级函数/方法/字段 + **可信行号**（块结束逐 token 取，跳过 HIDDEN/INDENT/DEDENT/NEWLINE，实测 `__init__` 的 end 不能信 DEDENT）
+- P4 依赖边（`a7e3c18`）：`PythonImportResolver` import 矩阵（from/别名/相对导入/再导出/星导入/子模块目标），去重、弃自环、弃仓外目标；修正单元 `packageName` 为模块路径
+- P5 框架与角色（`677ffcd`）：`UnitRoleAnnotator` 加 `language()` + `UnitRoleAnnotatorRegistry`（**按语言查表**，解掉"单例 Bean"的架构欠账）；`PythonRoleAnnotator`（装饰器/模块约定/脚本入口）+ 框架识别（Django/Flask/FastAPI，yml 可配）
+- P7 黄金样本验收（3 个样本自选：纯脚本 / Flask / Django），走真实 Spring 上下文 + 真实 yml，行号逐行断言。**端到端实测 `pallets/click`：303 单元 / 3497 边 / 0 失败文件**
+
+后端全量：**单元 337 全绿**（`mvn test`，integration 组默认排除）。
 
 ## 本地运行（已实测通过）
 ```bash
