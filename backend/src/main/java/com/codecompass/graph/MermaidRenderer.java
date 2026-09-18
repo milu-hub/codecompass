@@ -20,22 +20,24 @@ import com.codecompass.analyzer.DependencyEdge;
  *
  * <p><b>空图降级</b>：只有 {@code graph LR} 一行时 Mermaid 渲染不可靠，故空图输出占位节点。
  *
- * <p><b>T24 角色配色</b>：按节点角色输出 {@code classDef} + {@code class} 行
- * （entry 橙 / controller 蓝 / service 绿 / entity 灰 / mapper 紫 / repository 青）。
+ * <p><b>T24 角色配色</b>：按节点角色输出 {@code classDef} + {@code class} 行。
+ * 第六步改版：从「实色块 + 白字」改成「浅色填充 + 同族深色描边 + 墨色文字」——
+ * 浅底配深描边在大图里更容易分辨角色，墨字也保证可读（白字压在浅底上根本看不见）。
  * 配色顺序与节点顺序都固定，保持渲染确定性。
  */
 public class MermaidRenderer {
 
-    /** 角色 → 填充色。顺序即 classDef 输出顺序（确定性）。 */
+    /** 角色 → 样式（浅填充 / 同族深描边 / 墨色文字）。顺序即 classDef 输出顺序（确定性）。 */
     private static final Map<String, String> ROLE_STYLES = new LinkedHashMap<>();
 
     static {
-        ROLE_STYLES.put("entry", "fill:#fa8c16,stroke:#d46b08,color:#ffffff");
-        ROLE_STYLES.put("controller", "fill:#1677ff,stroke:#0958d9,color:#ffffff");
-        ROLE_STYLES.put("service", "fill:#52c41a,stroke:#389e0d,color:#ffffff");
-        ROLE_STYLES.put("entity", "fill:#8c8c8c,stroke:#595959,color:#ffffff");
-        ROLE_STYLES.put("mapper", "fill:#722ed1,stroke:#531dab,color:#ffffff");
-        ROLE_STYLES.put("repository", "fill:#13c2c2,stroke:#08979c,color:#ffffff");
+        ROLE_STYLES.put("entry", "fill:#fff3e0,stroke:#f57c00,color:#1f2a27");
+        ROLE_STYLES.put("controller", "fill:#e3f2fd,stroke:#1976d2,color:#1f2a27");
+        ROLE_STYLES.put("service", "fill:#e8f5e9,stroke:#388e3c,color:#1f2a27");
+        ROLE_STYLES.put("entity", "fill:#f5f5f5,stroke:#9e9e9e,color:#1f2a27");
+        ROLE_STYLES.put("mapper", "fill:#f3e5f5,stroke:#8e24aa,color:#1f2a27");
+        // 规格里没给 repository，按同族规则补一对青色（cyan 50 / cyan 700）
+        ROLE_STYLES.put("repository", "fill:#e0f7fa,stroke:#0097a7,color:#1f2a27");
     }
 
     public String render(List<GraphNode> nodes, List<DependencyEdge> edges) {

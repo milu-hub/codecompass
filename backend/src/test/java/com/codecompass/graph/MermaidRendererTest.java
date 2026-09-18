@@ -116,10 +116,13 @@ class MermaidRendererTest {
                 node("id-c", "Plain")), List.of());
 
         assertThat(mermaid)
-                .contains("classDef role_entry fill:#fa8c16")
+                .contains("classDef role_entry fill:#fff3e0,stroke:#f57c00,color:#1f2a27")
                 .contains("class n0 role_entry")
-                .contains("classDef role_controller fill:#1677ff")
+                .contains("classDef role_controller fill:#e3f2fd,stroke:#1976d2,color:#1f2a27")
                 .contains("class n1 role_controller");
+        assertThat(mermaid)
+                .as("浅底配深描边，文字必须是墨色——白字压在浅色填充上不可读")
+                .doesNotContain("color:#ffffff");
         assertThat(mermaid)
                 .as("未出现的角色不输出 classDef")
                 .doesNotContain("role_entity")
@@ -127,6 +130,24 @@ class MermaidRendererTest {
         assertThat(mermaid)
                 .as("无角色节点不挂 class")
                 .doesNotContain("class n2");
+    }
+
+    @Test
+    @DisplayName("六个角色都有浅底/深描边成对配色（规格外的 repository 按同族补青色）")
+    void everyRoleHasPastelPalette() {
+        String mermaid = renderer.render(List.of(
+                roleNode("id-a", "A", "entry"),
+                roleNode("id-b", "B", "controller"),
+                roleNode("id-c", "C", "service"),
+                roleNode("id-d", "D", "entity"),
+                roleNode("id-e", "E", "mapper"),
+                roleNode("id-f", "F", "repository")), List.of());
+
+        assertThat(mermaid)
+                .contains("role_service fill:#e8f5e9,stroke:#388e3c")
+                .contains("role_entity fill:#f5f5f5,stroke:#9e9e9e")
+                .contains("role_mapper fill:#f3e5f5,stroke:#8e24aa")
+                .contains("role_repository fill:#e0f7fa,stroke:#0097a7");
     }
 
     @Test
