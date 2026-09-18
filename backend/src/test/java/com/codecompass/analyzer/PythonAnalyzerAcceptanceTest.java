@@ -12,36 +12,36 @@ import org.springframework.boot.test.context.SpringBootTest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * T12 要求 5：多语言扩展点验收。
+ * 多语言扩展点验收（T12 的 stub 已被 P3 的真实 PythonAnalyzer 替换）。
  *
  * <p>两层断言缺一不可：
  * <ul>
- *   <li><b>运行态</b>：Python stub 经 ObjectProvider 自动进注册表，与 java 并存；</li>
+ *   <li><b>运行态</b>：Python 分析器经 ObjectProvider 自动进注册表，与 java 并存；</li>
  *   <li><b>结构态</b>：业务层（service/web/repo/graph/retrieve）源码零引用 {@code analyzer.python}
  *       —— 运行时绿不能证明结构没被破坏，加语言必须不碰业务层。</li>
  * </ul>
  */
 @SpringBootTest
-class PythonStubAcceptanceTest {
+class PythonAnalyzerAcceptanceTest {
 
     @Autowired
     private LanguageAnalyzerRegistry registry;
 
     @Test
-    @DisplayName("Python stub 自动注册：registry 同时提供 java 与 python，且 stub 返回空结果")
-    void pythonStubIsRegisteredAlongsideJava() {
+    @DisplayName("Python 分析器自动注册：registry 同时提供 java 与 python，空输入返回空结果")
+    void pythonAnalyzerIsRegisteredAlongsideJava() {
         LanguageAnalyzer python = registry.forLanguage("python").orElseThrow();
         assertThat(python.language()).isEqualTo("python");
-        assertThat(python.getClass().getSimpleName()).isEqualTo("PythonStubAnalyzer");
+        assertThat(python.getClass().getSimpleName()).isEqualTo("PythonAnalyzer");
         assertThat(registry.supportedLanguages()).containsExactlyInAnyOrder("java", "python");
 
-        AnalyzeResult result = python.analyze(
-                new AnalyzeRequest("repo-1", Path.of("."), List.of()));
+        AnalyzeResult result = python.analyze(new AnalyzeRequest("repo-1", Path.of("."), List.of()));
         assertThat(result.language()).isEqualTo("python");
         assertThat(result.framework()).isEmpty();
         assertThat(result.codeUnits()).isEmpty();
         assertThat(result.methods()).isEmpty();
         assertThat(result.dependencies()).isEmpty();
+        assertThat(result.failedFiles()).isEmpty();
     }
 
     @Test

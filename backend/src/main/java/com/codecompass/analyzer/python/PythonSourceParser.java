@@ -25,8 +25,9 @@ public final class PythonSourceParser {
     public record SyntaxIssue(int line, int column, String message) {
     }
 
-    /** 解析结果：总是有树（ANTLR 有错误恢复），问题列表为空表示干净解析。 */
-    public record ParseOutcome(ParseTree tree, List<SyntaxIssue> issues) {
+    /** 解析结果：总是有树（ANTLR 有错误恢复），问题列表为空表示干净解析。
+     *  tokens 交给后续的抽取器算行号范围（P3 §4.1：块结束行必须逐 token 取，不能信 DEDENT）。 */
+    public record ParseOutcome(ParseTree tree, CommonTokenStream tokens, List<SyntaxIssue> issues) {
     }
 
     public ParseOutcome parse(String source) {
@@ -39,7 +40,7 @@ public final class PythonSourceParser {
         parser.removeErrorListeners();
         parser.addErrorListener(errors);
         ParseTree tree = parser.file_input();
-        return new ParseOutcome(tree, List.copyOf(errors.issues));
+        return new ParseOutcome(tree, tokens, List.copyOf(errors.issues));
     }
 
     private static final class CollectingErrorListener extends BaseErrorListener {
