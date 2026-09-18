@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T19 F5 进度 + 成就（待用户指令，T14～T18 已全部完成并提交）
+T22 F6 分享页前端（待用户指令，T19～T21 已全部完成并提交）
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 285 + 集成 26 = 311，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 299 + 集成 28 = 327，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -174,6 +174,10 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：**迁移脚本双通纪律**：H2(MODE=MySQL) 与 MySQL 8 共用同一套 V1，只用方言交集（AUTO_INCREMENT/DATETIME/JSON/TEXT + 独立 CREATE INDEX，不写 ENGINE/UNIQUE KEY 行内子句）；upsert 用 `ON DUPLICATE KEY UPDATE ... VALUES()`（H2 MySQL 模式支持，MySQL 8 中弃用但可用）
 - 2026-09-18：**size() 澄清落地**：size() 自 T11 起就在 CacheService 接口里（接口未做任何改动），MysqlCacheService 按接口实现（只数未过期行，与内存版「存活条目」语义对齐）；测试计数按用户要求用 JdbcTemplate 直查 cache_entries
 - 2026-09-18：**T13 运行态证据**：后端带 DB_URL 启动 → Flyway 真迁移 codecompass 库；真实问答 3342ms 后 cache_entries 出现该问缓存行；同问 14ms 命中且答案逐字一致；集成套件写入的问答缓存与运行 app 共享同一张表（跨进程持久化实锤）。**T11 的串行教训再次应验**（集成套件与运行 jar 并行时克隆 409），此后一律串行
+- 2026-09-18：**成就配置绑定坑**：`@ConfigurationProperties(prefix="codecompass.achievements")` + 字段 `definitions` 要求 yml 写成 `achievements.definitions[]`（列表直接挂前缀下会静默绑定为空数组）——已修正并留 FlywayMigrationTest 级别探针教训
+- 2026-09-18：**F5 触发点的身份选择**：分析完成是异步管线（不带身份），analyze 触发点放在 RepoController.status「首次观察到 done」处（客户端轮询视角即「分析成功后」），refId=taskId 幂等——不动 F1 编排器
+- 2026-09-18：**Flyway 失败迁移修复流程（实测）**：MySQL DDL 非事务 + 迁移中途失败会在 schema_history 留 success=0 记录 → 下次启动 Validate 直接拒。修复 = 手动删除失败行（`DELETE ... WHERE success=0`）+ 保证迁移脚本对中间态幂等
+- 2026-09-18：**T21 分享语义决策**：「前 10 条问答」取**分享者自己的**（隐私优先，qa_history 按 clientId 过滤）；分享页成就只留 code+name（无 clientId/unlockedAt）；GET /share/** 不在 /api/** 拦截器范围 → 无 Cookie 无身份继承
 - 2026-09-18：**完整真实运行（全链路走查 + 全套测试）**：257 全绿（单元 236 + 集成 21，含真实 LLM 20 问、3 黄金样本、覆盖率 144/144）。经 Vite 代理走查：petclinic 25 单元/21 边、邻域 1 边、真实问答 2413ms 带 2 引用、**同问缓存命中 9ms（约 270 倍）答案逐字一致**、新问引用 94-122 即 processFindForm；第三样本 180 单元/80 边/0 失败文件，跨模块问答引用 CalcController+CalcService 正确
 - 2026-09-18：**环境坑 ×2**：① Vite 8 的 dev server 只绑 IPv6 `::1` —— `127.0.0.1:5173` 连不上、`localhost:5173` 正常，验收脚本一律用 localhost；② 昨天遗留的 Vite 僵尸进程占着 5173 且无响应（端口在监听、请求被拒），新实例被挤到 5174 —— 先清僵尸再重启才能回到标准端口
 - 2026-09-18：**F3 前端问答窗口**（`QaPanel.vue`）：提问带当前选中类为锚点、无选中退化为关键词检索；答案原文展示 + 引用标签点击定位到对应类（邻域图随之切换）；错误（409/429/502）展示后端原文；切换任务清空问答区。后端零改动，纯前端增量。真实浏览器走查（CDP 驱动 + 真实 DeepSeek）：锚点正确 → 回答上屏 → 5 条引用 → 点击引用后图标题切换为被引用类 ✓
@@ -185,3 +189,6 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - T16 F4 自动测验后端：`QuizService`（只把选中类源码发 LLM，逐题校验 reference 落在选中类行区间、题型/选项/下标校验、cap 10）、`QuizEntity`/`QuizRepository`、`QuizController`（生成 + 判分）。answer 用 0-based 下标（规避 SCHEMA 示例「A」歧义）。新增单元 10 + 集成 1（真机 + 真实 DeepSeek：≥5 题、reference 全合法、判分正确率）
 - T17 F4 测验前端：类列表加「测验」Tab（`QuizPanel`），选中类生成/逐题作答/提交判分显示得分与错题解析/引用跳转。真机走查：10 题生成、判分显示得分
 - T18 F5 匿名身份 + 笔记：`ClientIdentityInterceptor`（cc_client_id Cookie，30 天 HttpOnly，无则生成 UUID + upsert anonymous_users）、`ClientIdentityHolder`（ThreadLocal 上下文，测试可注入）、`IdentityService`、`/api/me`（GET 身份/PUT 昵称）、`NoteController`（笔记 CRUD，绑定 clientId 且所有权校验）、`AnonymousUserEntity`/`NoteEntity` + 仓储。新增单元 8 + 集成 1（真 HTTP：Cookie 恢复身份、昵称、笔记持久化与隔离）
+- T19 F5 进度 + 成就：`ProgressEntity/Repository`（upsert、status 校验）、`AchievementService`（规则全配置 `codecompass.achievements.definitions[]`，user_actions 计数 ≥ threshold 解锁、refId 幂等）、`AchievementEntity/Repository`、`ProgressController`/`AchievementController`。触发点：analyze（status 首次观察到 done，不碰 F1 编排器）、ask、note、quiz_perfect、path_done（最新学习路线全步骤 done）。新增单元 8 + 集成 1（真机分析解锁 FIRST_REPO、进度持久化、FIRST_NOTE）
+- T20 F5 前端：类列表进度圆点、右侧笔记面板（upsert/删除/解锁提示）、顶部成就徽章（popover 全量定义 + 分析完成时刷新并弹解锁通知）。**实测抓到两个真 bug 并修复**：单元 id（含 filePath）超 128 字符 → V2 加宽 code_unit_id 到 512 且唯一索引缩为 (client_id, code_unit_id)（三列索引超 InnoDB 3072 字节上限，实测 1071）；user_actions.ref_id 同样超宽 → V3 加宽。真实浏览器走查：成就徽章 + 笔记保存全通
+- T21 F6 分享领读页后端：`ShareService`（快照 = 仓库信息 + 依赖图 mermaid + 学习路线 + 分享者自己前 10 条问答 + 已解锁成就 code/name，无源码无 API key 无他人笔记）、`ShareSnapshotEntity/Repository`（30 天过期可配）、`ShareController`（POST 生成短链 / GET /share/{id} 独立 HTML + Mermaid CDN + UTF-8，过期 404「已过期」）。**前置补齐 qa_history 表（V4）**：ask 成功后旁路记录（失败不打断问答）。新增单元 6 + 集成 1（真机短链无 Cookie 打开、含依赖图、脱敏）
