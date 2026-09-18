@@ -5,9 +5,8 @@
  *
  * 1. **零文本损失**：一行切出的 token 文本按顺序拼接，必须与该行原文本逐字符相同。
  *    这是本模块唯一的硬不变量 —— 着色只允许改变"颜色"，不允许增删改任何字符。
- * 2. 跨行状态（斜杠星号块注释、`"""` 文本块）必须整段源码一次算完，不能逐行独立算，
- *    否则注释和字符串会串色到后面的代码行。写这个文件时自己就踩了一次：注释里直接写
- *    出块注释的结束符，会把 JSDoc 提前闭合掉。
+ * 2. 跨行状态（块注释、三引号文本块）必须整段源码一次算完，不能逐行独立算，
+ *    否则注释和字符串会串色到后面的代码行。
  * 3. 语言中立：按 language 取「行语法档案」，未知语言一律退化成纯文本（R9 中立，
  *    以后加语言只是往 PROFILES 里加一条，不动调用方）。
  *
@@ -27,12 +26,13 @@ interface LineSyntaxProfile {
   /** 保留字：命中一律按正文色，不再判方法/类型 */
   keywords: ReadonlySet<string>
   lineComment: string
-  blockCommentStart: string
-  blockCommentEnd: string
-  /** 注解前缀，如 Java 的 '@'；没有注解语法的语言传 null */
+  /** 块注释起止，如 Java 的 '/*' 与 '*​/'；没有块注释的语言传 null（Python） */
+  blockCommentStart: string | null
+  blockCommentEnd: string | null
+  /** 注解前缀，如 Java/Python 的 '@'；没有注解语法的语言传 null */
   annotationPrefix: string | null
-  /** 文本块分隔符，如 Java 的 '"""'；没有则 null */
-  textBlockDelimiter: string | null
+  /** 文本块分隔符列表，如 Java 的 ['"""']、Python 的 ['"""', "'''"]；没有则空数组 */
+  textBlockDelimiters: readonly string[]
 }
 
 const JAVA_KEYWORDS = new Set([
@@ -44,6 +44,13 @@ const JAVA_KEYWORDS = new Set([
   'this', 'throw', 'throws', 'transient', 'true', 'try', 'var', 'void', 'volatile', 'while', 'yield',
 ])
 
+const PYTHON_KEYWORDS = new Set([
+  'False', 'None', 'True', 'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue',
+  'def', 'del', 'elif', 'else', 'except', 'finally', 'for', 'from', 'global', 'if', 'import', 'in',
+  'is', 'lambda', 'match', 'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'try', 'while',
+  'with', 'yield',
+])
+
 /** 语言 → 行语法档案。加语言只加条目。 */
 const PROFILES: Record<string, LineSyntaxProfile> = {
   java: {
@@ -52,13 +59,23 @@ const PROFILES: Record<string, LineSyntaxProfile> = {
     blockCommentStart: '/*',
     blockCommentEnd: '*/',
     annotationPrefix: '@',
-    textBlockDelimiter: '"""',
+    textBlockDelimiters: ['"""'],
+  },
+  python: {
+    keywords: PYTHON_KEYWORDS,
+    lineComment: '#',
+    // Python 没有块注释；三引号是字符串/文档串，不是注释，所以走文本块
+    blockCommentStart: null,
+    blockCommentEnd: null,
+    annotationPrefix: '@',
+    textBlockDelimiters: ['"""', "'''"],
   },
 }
 
 interface ScanState {
   inBlockComment: boolean
-  inTextBlock: boolean
+  /** 当前所在文本块的闭合分隔符（进入时记下，跨行续写时用它找结尾） */
+  activeTextBlockDelimiter: string | null
 }
 
 function isIdentifierStart(char: string | undefined): boolean {
@@ -143,8 +160,8 @@ function tokenizeLine(
 
   let i = 0
   while (i < line.length) {
-    // 1) 块注释续行
-    if (state.inBlockComment) {
+    // 1) 块注释续行（只有声明了块注释的语言才会进入该状态）
+    if (state.inBlockComment && profile.blockCommentEnd) {
       const end = line.indexOf(profile.blockCommentEnd, i)
       if (end === -1) {
         push(line.slice(i), 'comment')
@@ -157,16 +174,17 @@ function tokenizeLine(
     }
 
     // 2) 文本块续行
-    if (state.inTextBlock && profile.textBlockDelimiter) {
-      const end = line.indexOf(profile.textBlockDelimiter, i)
+    if (state.activeTextBlockDelimiter) {
+      const delimiter = state.activeTextBlockDelimiter
+      const end = line.indexOf(delimiter, i)
       if (end === -1) {
         push(line.slice(i), 'string')
         return tokens
       }
-      const after = end + profile.textBlockDelimiter.length
+      const after = end + delimiter.length
       push(line.slice(i, after), 'string')
       i = after
-      state.inTextBlock = false
+      state.activeTextBlockDelimiter = null
       continue
     }
 
@@ -179,18 +197,21 @@ function tokenizeLine(
     }
 
     // 4) 块注释开头（同行闭合由下一轮的第 1 分支收尾）
-    if (rest.startsWith(profile.blockCommentStart)) {
+    if (profile.blockCommentStart && rest.startsWith(profile.blockCommentStart)) {
       push(profile.blockCommentStart, 'comment')
       i += profile.blockCommentStart.length
       state.inBlockComment = true
       continue
     }
 
-    // 5) 文本块开头
-    if (profile.textBlockDelimiter && rest.startsWith(profile.textBlockDelimiter)) {
-      push(profile.textBlockDelimiter, 'string')
-      i += profile.textBlockDelimiter.length
-      state.inTextBlock = true
+    // 5) 文本块开头（先于单引号字符串判断，三连引号不会被拆成三个单引号）
+    const textBlockDelimiter = profile.textBlockDelimiters.find((delimiter) =>
+      rest.startsWith(delimiter),
+    )
+    if (textBlockDelimiter) {
+      push(textBlockDelimiter, 'string')
+      i += textBlockDelimiter.length
+      state.activeTextBlockDelimiter = textBlockDelimiter
       continue
     }
 
@@ -247,6 +268,6 @@ export function highlightSource(language: string, lines: string[]): SourceToken[
   if (!profile) {
     return lines.map((line) => (line ? [{ text: line, kind: 'plain' as const }] : []))
   }
-  const state: ScanState = { inBlockComment: false, inTextBlock: false }
+  const state: ScanState = { inBlockComment: false, activeTextBlockDelimiter: null }
   return lines.map((line) => tokenizeLine(line, profile, state))
 }
