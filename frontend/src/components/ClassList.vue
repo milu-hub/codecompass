@@ -72,8 +72,10 @@ const filtered = computed(() => {
 </template>
 
 <style scoped>
+/* 列表吃掉卡片剩余高度，自己滚（原来写死 640px，白瞎了工作台的高度） */
 .class-list {
-  max-height: 640px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 

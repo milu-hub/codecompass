@@ -41,7 +41,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1100px;
+  max-width: var(--cc-layout-max-width);
   margin: 0 auto;
   padding: 12px 16px;
 }

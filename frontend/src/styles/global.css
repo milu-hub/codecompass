@@ -49,6 +49,13 @@
   --cc-code-method: #7b4bd6;
   --cc-code-string: #2b8a3e;
   --cc-code-comment: #98a6a0;
+
+  /* 源码区阅读尺寸：按 IDE 阅读习惯（14px / 1.6 行高），行号也按同一行盒对齐 */
+  --cc-code-font-size: 14px;
+  --cc-code-line-height: 1.6;
+
+  /* 工作台容器宽度：三栏工具界面用宽版，源码区才有 IDE 那种横向余量 */
+  --cc-layout-max-width: 1360px;
 }
 
 * {

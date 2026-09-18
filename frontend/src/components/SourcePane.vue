@@ -103,7 +103,7 @@ function onLineClick(lineNumber: number, lineText: string) {
 </script>
 
 <template>
-  <div class="source-pane">
+  <div class="source-editor">
     <div class="source-header">
       <span class="source-title">源码</span>
       <span v-if="source" class="source-file">{{ source.file }}</span>
@@ -143,9 +143,11 @@ function onLineClick(lineNumber: number, lineText: string) {
 </template>
 
 <style scoped>
-.source-pane {
+/* 源码面板自身：撑满外层玻璃卡片，代码区吃掉标题栏与问答区之外的全部高度 */
+.source-editor {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
 }
 
@@ -177,15 +179,16 @@ function onLineClick(lineNumber: number, lineText: string) {
 }
 
 .code-viewer {
+  /* 第五步之后：不再有 420px 上限，直接把卡片剩余高度吃满（IDE 式阅读区） */
   flex: 1;
   min-height: 0;
-  max-height: 420px;
   overflow: auto;
   border: 1px solid var(--cc-code-line);
   border-radius: var(--cc-radius-row);
   background: var(--cc-code-bg);
   font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: var(--cc-code-font-size);
+  line-height: var(--cc-code-line-height);
 }
 
 .code-line {
@@ -202,13 +205,15 @@ function onLineClick(lineNumber: number, lineText: string) {
   background: var(--cc-code-line-active);
 }
 
-/* 行号：固定宽度 + 右对齐，与代码之间一条 1px 分隔线 */
+/* 行号：固定宽度 + 右对齐，与代码之间一条 1px 分隔线。
+   行高取「代码字号 × 行高」的绝对值，这样 12px 的行号与 14px 的代码在同一行盒里基线对齐 */
 .line-number {
   flex-shrink: 0;
   width: 48px;
   padding-right: 8px;
   text-align: right;
   font-size: 12px;
+  line-height: calc(var(--cc-code-font-size) * var(--cc-code-line-height));
   color: var(--cc-code-gutter);
   user-select: none;
   border-right: 1px solid var(--cc-code-line);

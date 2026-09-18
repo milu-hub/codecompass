@@ -212,7 +212,7 @@ async function onSubmit() {
 /* 第二步：外层卡片退化成「透明容器」—— 让三栏玻璃卡片直接压在页面光晕上。
    否则毛玻璃背后垫着一层白底，玻璃等于白做。 */
 .main-card {
-  max-width: 1100px;
+  max-width: var(--cc-layout-max-width);
   margin: 24px auto;
   background: transparent;
   border: none;
@@ -268,30 +268,57 @@ async function onSubmit() {
   margin-top: 16px;
 }
 
+/* 工作台：三栏等高、撑满窗口剩余高度，各自内部滚动（IDE 式，不让整页滚动） */
 .result-layout {
   display: flex;
   gap: 16px;
   margin-top: 16px;
-  align-items: flex-start;
+  align-items: stretch;
+  height: calc(100dvh - 252px);
+  min-height: 460px;
 }
 
 /* 三栏各自成一张玻璃卡片（.cc-glass-card 提供材质，这里只管尺寸与内衬） */
 .list-pane {
+  display: flex;
+  flex-direction: column;
   width: 300px;
   flex-shrink: 0;
+  min-height: 0;
   padding: 12px;
 }
 
+/* 源码栏明显大于右侧信息栏：它是主工作面，按 IDE 阅读区给宽度 */
 .source-pane {
-  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1.6 1 0;
   min-width: 0;
+  min-height: 0;
   padding: 12px;
 }
 
 .right-pane {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
   padding: 12px;
+}
+
+/* 右侧 Tab 内容区自己滚，避免图/路线撑破玻璃卡片 */
+.right-pane :deep(.el-tabs) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.right-pane :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .graph-hint {

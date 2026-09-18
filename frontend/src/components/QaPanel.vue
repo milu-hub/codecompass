@@ -133,6 +133,8 @@ function shortName(file: string): string {
   margin-top: 12px;
   border-top: 1px solid #ebeef5;
   padding-top: 12px;
+  /* 问答区不抢源码区的高度：无论答案多长，都只占自己那块并内部滚动 */
+  flex-shrink: 0;
 }
 
 .qa-header {
@@ -166,6 +168,8 @@ function shortName(file: string): string {
 
 .qa-answer {
   margin-top: 12px;
+  max-height: 260px;
+  overflow-y: auto;
 }
 
 .answer-text {
