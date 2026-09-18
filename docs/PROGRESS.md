@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T23 端到端验收
+无 —— F2/F4/F5/F6 按 T13～T24 全部交付（验收见 `docs/T23-验收报告.md`）
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 299 + 集成 28 = 327，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 304 + 集成 28 = 332，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -178,6 +178,9 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：**F5 触发点的身份选择**：分析完成是异步管线（不带身份），analyze 触发点放在 RepoController.status「首次观察到 done」处（客户端轮询视角即「分析成功后」），refId=taskId 幂等——不动 F1 编排器
 - 2026-09-18：**Flyway 失败迁移修复流程（实测）**：MySQL DDL 非事务 + 迁移中途失败会在 schema_history 留 success=0 记录 → 下次启动 Validate 直接拒。修复 = 手动删除失败行（`DELETE ... WHERE success=0`）+ 保证迁移脚本对中间态幂等
 - 2026-09-18：**T21 分享语义决策**：「前 10 条问答」取**分享者自己的**（隐私优先，qa_history 按 clientId 过滤）；分享页成就只留 code+name（无 clientId/unlockedAt）；GET /share/** 不在 /api/** 拦截器范围 → 无 Cookie 无身份继承
+- 2026-09-18：**T23 双方言测试两条纪律**（真 MySQL 才暴露、H2 永远掩盖）：① 断言 JSON 列内容用**解析后 JSON 树相等**，不用字节相等（MySQL 规范化格式）；② 触碰持久库的测试要 `@Transactional` 回滚 + 每轮唯一键，否则上一轮残留会挡住唯一约束插入
+- 2026-09-18：**T24 角色配色的配置边界**：entity(`@Entity`)/mapper(`@Mapper`) 是 JPA/MyBatis 注解、不是框架标记 —— 放进 framework-markers 会让「纯 JPA 仓库」被误判成 Spring，故新增 `role-only-annotations` 配置项把它们从配置漂移告警里排除（配置驱动，分类器代码只加一处过滤）
+- 2026-09-18：**T24 默认视图决策**：进入结果页**不预选任何类**（原先自动选第一个类）——「默认不铺全图、点击类才显示邻域」要求首屏是引导提示而非别人的图；中栏同步显示「点击左侧的类，查看它的源码」
 - 2026-09-18：**完整真实运行（全链路走查 + 全套测试）**：257 全绿（单元 236 + 集成 21，含真实 LLM 20 问、3 黄金样本、覆盖率 144/144）。经 Vite 代理走查：petclinic 25 单元/21 边、邻域 1 边、真实问答 2413ms 带 2 引用、**同问缓存命中 9ms（约 270 倍）答案逐字一致**、新问引用 94-122 即 processFindForm；第三样本 180 单元/80 边/0 失败文件，跨模块问答引用 CalcController+CalcService 正确
 - 2026-09-18：**环境坑 ×2**：① Vite 8 的 dev server 只绑 IPv6 `::1` —— `127.0.0.1:5173` 连不上、`localhost:5173` 正常，验收脚本一律用 localhost；② 昨天遗留的 Vite 僵尸进程占着 5173 且无响应（端口在监听、请求被拒），新实例被挤到 5174 —— 先清僵尸再重启才能回到标准端口
 - 2026-09-18：**F3 前端问答窗口**（`QaPanel.vue`）：提问带当前选中类为锚点、无选中退化为关键词检索；答案原文展示 + 引用标签点击定位到对应类（邻域图随之切换）；错误（409/429/502）展示后端原文；切换任务清空问答区。后端零改动，纯前端增量。真实浏览器走查（CDP 驱动 + 真实 DeepSeek）：锚点正确 → 回答上屏 → 5 条引用 → 点击引用后图标题切换为被引用类 ✓
@@ -193,3 +196,5 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - T20 F5 前端：类列表进度圆点、右侧笔记面板（upsert/删除/解锁提示）、顶部成就徽章（popover 全量定义 + 分析完成时刷新并弹解锁通知）。**实测抓到两个真 bug 并修复**：单元 id（含 filePath）超 128 字符 → V2 加宽 code_unit_id 到 512 且唯一索引缩为 (client_id, code_unit_id)（三列索引超 InnoDB 3072 字节上限，实测 1071）；user_actions.ref_id 同样超宽 → V3 加宽。真实浏览器走查：成就徽章 + 笔记保存全通
 - T21 F6 分享领读页后端：`ShareService`（快照 = 仓库信息 + 依赖图 mermaid + 学习路线 + 分享者自己前 10 条问答 + 已解锁成就 code/name，无源码无 API key 无他人笔记）、`ShareSnapshotEntity/Repository`（30 天过期可配）、`ShareController`（POST 生成短链 / GET /share/{id} 独立 HTML + Mermaid CDN + UTF-8，过期 404「已过期」）。**前置补齐 qa_history 表（V4）**：ask 成功后旁路记录（失败不打断问答）。新增单元 6 + 集成 1（真机短链无 Cookie 打开、含依赖图、脱敏）
 - T22 F6 分享页前端：结果区「生成分享页」按钮 + 短链弹窗（复制/打开）；分享页本体是后端渲染 HTML（FEATURE_SPEC 明确不复用 SPA）。**补齐 Vite `/share` 代理**（dev 下短链走 :5173，不代理会 404 —— 与 T8 补 /api 代理同款）。真机走查：弹窗短链可用，分享页 200 且含依赖图/学习路线/问答/页脚、不含源码
+- T23 端到端验收：**327 全绿**（单元 299 + 集成 28，含真机克隆 3 样本 + 真 MySQL + 真实 DeepSeek），`docs/T23-验收报告.md` 逐项映射证据。本轮修 2 类**双方言测试断言**：① JSON 列回环改「解析后 JSON 树相等」（MySQL 会规范化 JSON 格式，字节比较只在 H2 成立）；② 仓储测试改 @Transactional + 每轮唯一键（真 MySQL 不随测试重建，固定键会被上轮残留挡住）
+- T24 UI 统一修正：`MermaidRenderer` 按角色输出 classDef/class（entry 橙 / controller 蓝 / service 绿 / entity 灰 / mapper 紫 / repository 青，顺序与节点顺序固定保证确定性）；core-annotations 加 entity/mapper 两个非 Spring 角色 + `role-only-annotations` 配置（把它们从「未进 framework-markers」漂移告警里排除，避免纯 JPA 仓库被误判成 Spring）；前端三栏（左类列表+进度 / 中源码+问答 / 右 Tab：依赖图·学习路线·测验·笔记·成就），**默认不铺全图也不预选类**，点类才出邻域。真机走查：默认提示、点类出邻域、五 Tab、问答 12 条引用全通。新增单元 5
