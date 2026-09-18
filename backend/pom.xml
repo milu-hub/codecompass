@@ -46,6 +46,43 @@
       <artifactId>javaparser-core</artifactId>
       <version>3.28.2</version>
     </dependency>
+
+    <!-- ============ T13 MySQL 持久化基础设施（F2/F6 阶段） ============ -->
+
+    <!-- JDBC + Flyway（版本由 Boot 4.1.1 BOM 管理，Flyway 12 + flyway-mysql） -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-mysql</artifactId>
+    </dependency>
+
+    <!-- MySQL 驱动（生产/集成）；连接串从 DB_URL / DB_USER / DB_PASSWORD 环境变量读 -->
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <!-- 单元测试数据库：H2 的 MySQL 兼容模式，同一套 Flyway 脚本双通 -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- MyBatis-Plus（规格书允许的 JPA 路线为备选，见 T13 预研记录） -->
+    <dependency>
+      <groupId>com.baomidou</groupId>
+      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+      <version>3.5.12</version>
+    </dependency>
   </dependencies>
 
   <build>
