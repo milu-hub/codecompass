@@ -11,7 +11,7 @@ const { achievements } = storeToRefs(repository)
 </script>
 
 <template>
-  <div class="achievement-panel">
+  <div class="achievement-panel cc-glass-strong">
     <p v-if="achievements.length === 0" class="empty-hint">尚无成就定义。</p>
     <div
       v-for="achievement in achievements"
@@ -31,17 +31,19 @@ const { achievements } = storeToRefs(repository)
 .achievement-panel {
   max-height: 560px;
   overflow-y: auto;
+  /* 第二步：成就面板是一层更厚的毛玻璃（.cc-glass-strong），这里补内衬与分隔线 */
+  padding: 8px 12px;
 }
 
 .empty-hint {
-  color: #909399;
+  color: var(--cc-text-faint);
   text-align: center;
   padding: 12px;
 }
 
 .achievement-row {
   padding: 8px 4px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--cc-line);
 }
 
 .achievement-row.unlocked .achievement-name {

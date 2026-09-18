@@ -15,10 +15,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <header class="app-header">
-    <span class="app-title">CodeCompass</span>
-    <!-- F5：成就入口（顶部） -->
-    <AchievementsBadge />
+  <header class="app-header cc-glass-bar">
+    <div class="app-header-inner">
+      <span class="app-title">CodeCompass</span>
+      <!-- F5：成就入口（顶部） -->
+      <AchievementsBadge />
+    </div>
   </header>
   <RepositoryView />
   <footer class="app-footer">
@@ -27,13 +29,21 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 第二步：顶部栏做成吸顶毛玻璃条 —— 滚动时内容从玻璃下穿过 */
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid var(--cc-glass-line);
+}
+
+.app-header-inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 12px 16px 0;
+  padding: 12px 16px;
 }
 
 .app-title {

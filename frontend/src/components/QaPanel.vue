@@ -86,6 +86,7 @@ function shortName(file: string): string {
     <div class="qa-input-row">
       <el-input
         v-model="question"
+        class="cc-glass-input"
         placeholder="针对代码提问，如：processFindForm 方法做什么"
         :disabled="asking"
         clearable

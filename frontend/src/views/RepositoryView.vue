@@ -108,6 +108,7 @@ async function onSubmit() {
     <div class="input-row">
       <el-input
         v-model="url"
+        class="cc-glass-input"
         placeholder="输入 GitHub 仓库地址，如 https://github.com/spring-projects/spring-petclinic"
         :disabled="busy"
         clearable
@@ -136,7 +137,7 @@ async function onSubmit() {
 
     <!-- 结果区 -->
     <div v-if="phase === 'done' && graph" class="result-layout">
-      <div class="list-pane">
+      <div class="list-pane cc-glass-card">
         <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
         <ClassList
           :units="graph.codeUnits"
@@ -147,7 +148,7 @@ async function onSubmit() {
         />
       </div>
 
-      <div class="source-pane">
+      <div class="source-pane cc-glass-card">
         <!-- T14：选中类源码（点行选中标识符） -->
         <SourcePane />
         <!-- F3：AI 问答（点类提问 + 选中标识符行锚点） -->
@@ -155,8 +156,8 @@ async function onSubmit() {
       </div>
 
       <!-- T24：右栏统一 Tab —— 图 / 学习路线 / 测验 / 笔记 / 成就 -->
-      <div class="right-pane">
-        <el-tabs v-model="rightTab">
+      <div class="right-pane cc-glass-card">
+        <el-tabs v-model="rightTab" class="cc-glass-tabs">
           <el-tab-pane label="依赖图" name="graph">
             <div class="graph-header">
               <span class="graph-title">
@@ -208,9 +209,25 @@ async function onSubmit() {
 </template>
 
 <style scoped>
+/* 第二步：外层卡片退化成「透明容器」—— 让三栏玻璃卡片直接压在页面光晕上。
+   否则毛玻璃背后垫着一层白底，玻璃等于白做。 */
 .main-card {
   max-width: 1100px;
   margin: 24px auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 内衬 16px，与顶部栏内容对齐 */
+.main-card :deep(.el-card__header) {
+  padding: 0 16px 12px;
+  border-bottom: none;
+}
+
+.main-card :deep(.el-card__body) {
+  padding: 0 16px;
 }
 
 .language-tag {
@@ -258,21 +275,23 @@ async function onSubmit() {
   align-items: flex-start;
 }
 
+/* 三栏各自成一张玻璃卡片（.cc-glass-card 提供材质，这里只管尺寸与内衬） */
 .list-pane {
-  width: 280px;
+  width: 300px;
   flex-shrink: 0;
-  border-right: 1px solid #ebeef5;
-  padding-right: 12px;
+  padding: 12px;
 }
 
 .source-pane {
   flex: 1 1 0;
   min-width: 0;
+  padding: 12px;
 }
 
 .right-pane {
   flex: 1 1 0;
   min-width: 0;
+  padding: 12px;
 }
 
 .graph-hint {

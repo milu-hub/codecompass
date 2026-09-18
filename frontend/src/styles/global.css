@@ -26,6 +26,17 @@
   --cc-radius-card: 16px;
   --cc-radius-row: 8px;
   --cc-radius-input: 8px;
+
+  /* 毛玻璃材质令牌（第二步） */
+  --cc-glass-bg-bar: rgba(255, 255, 255, 0.72);
+  --cc-glass-bg-card: rgba(255, 255, 255, 0.75);
+  --cc-glass-bg-panel: rgba(255, 255, 255, 0.82);
+  --cc-glass-bg-thin: rgba(255, 255, 255, 0.5);
+  --cc-glass-bg-input: rgba(255, 255, 255, 0.6);
+  --cc-glass-border: rgba(255, 255, 255, 0.9);
+  --cc-glass-line: rgba(220, 230, 225, 0.5);
+  --cc-glass-line-strong: rgba(220, 230, 225, 0.8);
+  --cc-glass-shadow: 0 8px 32px rgba(31, 42, 39, 0.06);
 }
 
 * {
@@ -56,4 +67,95 @@ body {
   background-attachment: fixed;
   background-repeat: no-repeat;
   background-size: cover;
+}
+
+/* ==========================================================================
+   第二步：毛玻璃材质层
+   --------------------------------------------------------------------------
+   只有 5 个「容器型」表面允许用毛玻璃，按清晰度需求分级：
+     1) 顶部栏        .cc-glass-bar      blur(20px) saturate(180%)
+     2) 三栏卡片      .cc-glass-card     blur(16px) saturate(150%) + 亮边 + 柔和投影
+     3) 右栏 Tab 条   .cc-glass-tabs     blur(8px)
+     4) 输入框        .cc-glass-input    blur(8px)
+     5) 成就面板      .cc-glass-strong   blur(24px) saturate(180%)
+
+   硬规则（不可违反）：**源码区、类列表项、依赖图节点一律实底，禁用毛玻璃** ——
+   这三处是内容密度最高、需要像素级清晰度的地方，模糊会直接损害可读性。
+   毛玻璃只做「分层」，不做「装饰」。
+   ========================================================================== */
+
+.cc-glass-bar {
+  background: var(--cc-glass-bg-bar);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+.cc-glass-card {
+  background: var(--cc-glass-bg-card);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--cc-glass-border);
+  border-radius: var(--cc-radius-card);
+  box-shadow: var(--cc-glass-shadow);
+}
+
+.cc-glass-strong {
+  background: var(--cc-glass-bg-panel);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-radius: var(--cc-radius-row);
+}
+
+/* 右栏 Tab 条：只在导航条上铺一层薄玻璃，Tab 内容区保持实底 */
+.cc-glass-tabs > .el-tabs__header {
+  background: var(--cc-glass-bg-thin);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border-radius: var(--cc-radius-row);
+  padding: 0 8px;
+}
+
+.cc-glass-tabs > .el-tabs__header .el-tabs__nav-wrap::after {
+  height: 1px;
+  background-color: var(--cc-glass-line-strong);
+}
+
+/* 输入框：玻璃底 + 亮边；聚焦态用主色描边，保证状态可辨 */
+.cc-glass-input .el-input__wrapper {
+  background-color: var(--cc-glass-bg-input);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px var(--cc-glass-line-strong) inset;
+}
+
+.cc-glass-input .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--cc-text-faint) inset;
+}
+
+.cc-glass-input .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--cc-accent) inset;
+}
+
+/* 可访问性回退：系统「降低透明度」时全部退化为实底，不牺牲对比度 */
+@media (prefers-reduced-transparency: reduce) {
+  .cc-glass-bar {
+    background: #ffffff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .cc-glass-card {
+    background: #ffffff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: var(--cc-glass-line-strong);
+  }
+
+  .cc-glass-strong,
+  .cc-glass-tabs > .el-tabs__header,
+  .cc-glass-input .el-input__wrapper {
+    background: #ffffff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
