@@ -55,11 +55,19 @@ onMounted(() => {
 }
 
 .app-footer {
+  /* 页面现在有两屏高：状态条做成吸底，滚动时不会跑到两屏之外（避免"断层"） */
+  position: sticky;
+  bottom: 0;
+  z-index: 90;
   text-align: center;
   /* 页脚只是连通性一行字，别占掉工作台的高度 */
   flex-shrink: 0;
   margin-top: 12px;
   padding: 8px;
+  border-top: 1px solid var(--cc-glass-line);
+  background: var(--cc-glass-bg-bar);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
   color: #909399;
 }
 </style>
