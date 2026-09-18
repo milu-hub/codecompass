@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath, generateQuiz, submitQuiz, fetchProgress, updateProgress, fetchNotes, saveNote, updateNote, deleteNote, fetchAchievements } from '../api/repos'
-import type { AnalysisTaskView, GraphResponse, LearningPath, Quiz, QuizGrade, NoteView, AchievementView } from '../api/repos'
+import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath, generateQuiz, submitQuiz, fetchProgress, updateProgress, fetchNotes, saveNote, updateNote, deleteNote, fetchAchievements, createShareLink } from '../api/repos'
+import type { AnalysisTaskView, GraphResponse, LearningPath, Quiz, QuizGrade, NoteView, AchievementView, ShareLink } from '../api/repos'
 
 export type TaskPhase = 'idle' | 'submitting' | 'pending' | 'running' | 'done' | 'failed'
 
@@ -40,6 +40,7 @@ export const useRepositoryStore = defineStore('repository', {
     unitProgress: {} as Record<string, string>,
     notes: [] as NoteView[],
     achievements: [] as AchievementView[],
+    shareLink: null as ShareLink | null,
     pollingHandle: null as number | null,
     // 点击类的请求竞态令牌：晚到的旧响应必须丢弃
     unitRequestToken: 0,
@@ -216,6 +217,14 @@ export const useRepositoryStore = defineStore('repository', {
       )
       this.achievements = next
       return next.filter((a) => a.unlockedAt && !previouslyUnlocked.has(a.code))
+    },
+
+    /** F6：生成分享短链。 */
+    async generateShareLink() {
+      if (!this.taskId) {
+        return
+      }
+      this.shareLink = await createShareLink(this.taskId)
     },
   },
 })

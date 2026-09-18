@@ -6,6 +6,8 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 // 开发期通过 dev server 代理转发到后端，前端一律使用相对路径 /health 与 /api。
 // 这样浏览器视角同源，后端不需要任何 CORS 配置。
 // 注意：/api 代理是 T8 才补上的 —— T7 之前只有 /health，前端调 /api/repos 会 404。
+// /share 代理是 T22 补的 —— 分享短链由后端渲染（GET /share/{id}），
+// dev 下短链是 :5173/share/xxx，不代理就会 404（生产由 Nginx 路由）。
 export default defineConfig({
   plugins: [
     vue(),
@@ -29,6 +31,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/share': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },

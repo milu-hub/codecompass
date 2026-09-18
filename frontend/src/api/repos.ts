@@ -252,3 +252,16 @@ export interface AchievementView {
 export function fetchAchievements(): Promise<AchievementView[]> {
   return getJson<AchievementView[]>('/api/achievements')
 }
+
+// ---------- F6 分享（T21/T22） ----------
+
+export interface ShareLink {
+  shareId: string
+  /** 相对短链，如 /share/abc123def456 */
+  url: string
+}
+
+/** 生成分享快照，返回短链。 */
+export function createShareLink(taskId: string): Promise<ShareLink> {
+  return postJson<ShareLink>(`/api/repos/${taskId}/share`, {})
+}

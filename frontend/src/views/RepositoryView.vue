@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { ElMessage } from 'element-plus'
 import { useRepositoryStore } from '../stores/repository'
 import ClassList from '../components/ClassList.vue'
 import DependencyGraphPane from '../components/DependencyGraphPane.vue'
@@ -27,6 +28,35 @@ const {
 
 const showFullGraph = ref(false)
 const listTab = ref<'classes' | 'path' | 'quiz'>('classes')
+
+// F6：分享短链弹窗
+const shareDialogVisible = ref(false)
+const sharing = ref(false)
+const shareUrl = computed(() =>
+  repository.shareLink ? `${window.location.origin}${repository.shareLink.url}` : '',
+)
+
+async function onGenerateShare() {
+  sharing.value = true
+  try {
+    await repository.generateShareLink()
+    shareDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    sharing.value = false
+  }
+}
+
+async function copyShareLink() {
+  try {
+    await navigator.clipboard.writeText(shareUrl.value)
+    ElMessage.success('短链已复制')
+  } catch {
+    // 剪贴板不可用（非安全上下文）时退回选中提示
+    ElMessage.warning('复制失败，请手动复制')
+  }
+}
 
 const displayedMermaid = computed(() => {
   if (showFullGraph.value && graph.value) {
@@ -60,6 +90,16 @@ async function onSubmit() {
       <el-tag v-if="framework" size="small" type="success" class="language-tag">
         {{ framework }}
       </el-tag>
+      <!-- F6：生成分享页（分析完成后） -->
+      <el-button
+        v-if="phase === 'done' && graph"
+        class="share-button"
+        size="small"
+        :loading="sharing"
+        @click="onGenerateShare"
+      >
+        生成分享页
+      </el-button>
     </template>
 
     <!-- 输入区 -->
@@ -140,6 +180,19 @@ async function onSubmit() {
       </div>
     </div>
   </el-card>
+
+  <!-- F6：分享短链弹窗（只读分享页由后端渲染，见 /share/{id}） -->
+  <el-dialog v-model="shareDialogVisible" title="分享领读页" width="520">
+    <p class="share-hint">任何人（无需 Cookie）都可打开这条短链，页面为只读。</p>
+    <div class="share-link-row">
+      <el-input v-model="shareUrl" readonly />
+      <el-button type="primary" @click="copyShareLink">复制</el-button>
+    </div>
+    <template #footer>
+      <el-button @click="shareDialogVisible = false">关闭</el-button>
+      <el-link :href="shareUrl" target="_blank" type="primary">打开分享页</el-link>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -150,6 +203,21 @@ async function onSubmit() {
 
 .language-tag {
   margin-left: 8px;
+}
+
+.share-button {
+  float: right;
+}
+
+.share-hint {
+  color: #909399;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
 }
 
 .input-row {
