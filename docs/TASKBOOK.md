@@ -1,6 +1,6 @@
 # CodeCompass MVP 任务书 v0.3
 
-> 本文件是 CodeCompass MVP 的**唯一需求来源**。与《项目背景》《dsh 协作指南》冲突时，以本文件为准。产品目标面向多语言；MVP 只实现 Java / Spring 解析器，其余语言只预留接口，不实现。
+> 本文件是 CodeCompass MVP 的**唯一需求来源**。与《项目背景》《dsh 协作指南》冲突时，以本文件为准。产品目标面向多语言；MVP 首发实现 Java / Spring 解析器，**Python 解析器已立项（见 `PYTHON_ANALYZER_PLAN.md`，任务 P1–P8）**，其余语言只预留接口，不实现。
 
 ## 01 垂直切片
 
@@ -45,8 +45,11 @@
 ### 第一版不做（F1/F3 阶段）
 
 > **注**：以下限制仅适用于 F1/F3 阶段。F2/F4/F5/F6 阶段已解除，以 `FEATURE_SPEC_F2_F6.md` 为准。
+> **注（Python 里程碑）**：「Java 以外的解析器实现」一条已被 `PYTHON_ANALYZER_PLAN.md` 解除 ——
+> 本期实现 **Python** 解析器（任务编号 P1–P8），Python 以外的语言（Go / TypeScript 等）仍只预留接口。
 
-- Java 以外的解析器实现（Python / Go / TypeScript 等只预留接口）
+- ~~Java 以外的解析器实现（Python / Go / TypeScript 等只预留接口）~~
+  → 改为：**Python 已立项实现（见 `PYTHON_ANALYZER_PLAN.md`）；Go / TypeScript 等仍只预留接口，不实现**
 - 登录 / JWT / Spring Security
 - Redis（MVP 用内存缓存）
 - Spoon、向量数据库、方法级调用图

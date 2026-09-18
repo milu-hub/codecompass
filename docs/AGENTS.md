@@ -9,7 +9,7 @@
 Java 21 + Spring Boot 4.x + Maven + Vue3
 
 **支持的解析目标**（产品能力）：
-多语言目标，MVP 首发只实现 Java / Spring 解析器
+多语言目标；已实现 Java / Spring 解析器，**Python 解析器已立项**（`PYTHON_ANALYZER_PLAN.md`，任务 P1–P8）
 
 ## 每次提问的节奏
 
@@ -38,8 +38,8 @@ Java 21 + Spring Boot 4.x + Maven + Vue3
 
 【MVP 支持的解析目标】
 - 产品目标面向多语言，不绑定单一语言
-- MVP 首发只实现 Java / Spring 解析器
-- 只解析 **/src/main/java
+- MVP 首发已实现 Java / Spring 解析器；**Python 解析器已立项（见 `PYTHON_ANALYZER_PLAN.md`，任务 P1–P8）**
+- Java 只解析 **/src/main/java；Python 的扫描范围以 `PYTHON_ANALYZER_PLAN.md` §3.2 为准
 - 单仓库文件数上限 1000，单文件大小上限 20MB，单仓库大小上限 500MB
 - 第一版只做类级依赖图
 - 解析层抽象为 LanguageAnalyzer 接口
@@ -55,7 +55,7 @@ Java 21 + Spring Boot 4.x + Maven + Vue3
 3. [要求 3]
 
 不要做：
-- 不要实现 Java 以外的解析器
+- 不要实现 Python 以外的解析器（Python 已立项，见 `PYTHON_ANALYZER_PLAN.md`；仍不实现 Go / TypeScript 等）
 - [禁止事项 2]
 - 不要使用 Jackson 2 的 import（`com.fasterxml.jackson.databind.*`）；
   Jackson 3 核心类已迁移到 `tools.jackson.databind.*`；
@@ -71,7 +71,7 @@ Java 21 + Spring Boot 4.x + Maven + Vue3
 
 ## 每次必加的"不要做"
 
-- 不要实现 Java 以外的解析器
+- 不要实现 Python 以外的解析器（Python 已立项；Go / TypeScript 等仍只预留接口）
 - 不要把 Java 特有逻辑写进业务层
 - 不要引入 Spoon
 - 不要用向量数据库
