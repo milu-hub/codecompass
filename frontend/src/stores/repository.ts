@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath } from '../api/repos'
-import type { AnalysisTaskView, GraphResponse, LearningPath } from '../api/repos'
+import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath, generateQuiz, submitQuiz } from '../api/repos'
+import type { AnalysisTaskView, GraphResponse, LearningPath, Quiz, QuizGrade } from '../api/repos'
 
 export type TaskPhase = 'idle' | 'submitting' | 'pending' | 'running' | 'done' | 'failed'
 
@@ -35,6 +35,8 @@ export const useRepositoryStore = defineStore('repository', {
     filterText: '',
     selection: null as SourceSelection | null,
     learningPath: null as LearningPath | null,
+    quiz: null as Quiz | null,
+    quizGrade: null as QuizGrade | null,
     pollingHandle: null as number | null,
     // 点击类的请求竞态令牌：晚到的旧响应必须丢弃
     unitRequestToken: 0,
@@ -56,6 +58,8 @@ export const useRepositoryStore = defineStore('repository', {
       this.neighborhood = null
       this.selectedUnitId = null
       this.learningPath = null
+      this.quiz = null
+      this.quizGrade = null
       this.progress = 0
       this.message = ''
       try {
@@ -156,6 +160,21 @@ export const useRepositoryStore = defineStore('repository', {
         return
       }
       this.learningPath = await generateLearningPath(this.taskId)
+    },
+
+    async generateQuiz(codeUnitIds: string[]) {
+      if (!this.taskId) {
+        return
+      }
+      this.quiz = await generateQuiz(this.taskId, codeUnitIds)
+      this.quizGrade = null
+    },
+
+    async submitQuiz(answers: { questionId: string; answerIndex: number }[]) {
+      if (!this.quiz) {
+        return
+      }
+      this.quizGrade = await submitQuiz(this.quiz.id, answers)
     },
   },
 })

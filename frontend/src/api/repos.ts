@@ -153,3 +153,47 @@ export function generateLearningPath(taskId: string): Promise<LearningPath> {
 export function fetchLearningPath(taskId: string): Promise<LearningPath> {
   return getJson<LearningPath>(`/api/repos/${taskId}/learning-path`)
 }
+
+// ---------- F4 自动测验（T16/T17） ----------
+
+export interface QuizReference {
+  file: string
+  language: string
+  startLine: number
+  endLine: number
+}
+
+export interface QuizQuestion {
+  id: string
+  type: 'single_choice' | 'true_false'
+  question: string
+  options: string[]
+  /** 正确选项的 0-based 下标 */
+  answer: number
+  explanation: string
+  reference: QuizReference
+}
+
+export interface Quiz {
+  id: string
+  repoUrl: string
+  commitSha: string
+  questions: QuizQuestion[]
+}
+
+export interface QuizGrade {
+  correct: number
+  total: number
+  accuracy: number
+}
+
+export function generateQuiz(taskId: string, codeUnitIds: string[]): Promise<Quiz> {
+  return postJson<Quiz>(`/api/repos/${taskId}/quiz`, { codeUnitIds })
+}
+
+export function submitQuiz(
+  quizId: string,
+  answers: { questionId: string; answerIndex: number }[],
+): Promise<QuizGrade> {
+  return postJson<QuizGrade>(`/api/quizzes/${quizId}/submit`, { answers })
+}

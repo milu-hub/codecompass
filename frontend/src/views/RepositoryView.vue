@@ -7,6 +7,7 @@ import DependencyGraphPane from '../components/DependencyGraphPane.vue'
 import QaPanel from '../components/QaPanel.vue'
 import SourcePane from '../components/SourcePane.vue'
 import LearningPathPanel from '../components/LearningPathPanel.vue'
+import QuizPanel from '../components/QuizPanel.vue'
 
 const repository = useRepositoryStore()
 const {
@@ -24,7 +25,7 @@ const {
 } = storeToRefs(repository)
 
 const showFullGraph = ref(false)
-const listTab = ref<'classes' | 'path'>('classes')
+const listTab = ref<'classes' | 'path' | 'quiz'>('classes')
 
 const displayedMermaid = computed(() => {
   if (showFullGraph.value && graph.value) {
@@ -105,6 +106,9 @@ async function onSubmit() {
           </el-tab-pane>
           <el-tab-pane label="学习路线" name="path">
             <LearningPathPanel />
+          </el-tab-pane>
+          <el-tab-pane label="测验" name="quiz">
+            <QuizPanel />
           </el-tab-pane>
         </el-tabs>
       </div>
