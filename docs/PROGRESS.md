@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-Python 解析器已交付（P1–P7，见下）；收尾中：前端 Python 高亮档案（P6）+ 分享页学习路线美化（第 7 步）。
+Python 解析器（P1–P8）与前端收尾（Python 高亮档案 P6 + 分享页学习路线美化第 7 步）已全部完成。下一步待用户指定。
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 306 + 集成 28 = 334，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 338 + 集成 28 = 366，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -33,9 +33,14 @@ Python 解析器已交付（P1–P7，见下）；收尾中：前端 Python 高�
 - P3 结构抽取（`e63e177`）：`PythonAnalyzer` 替换 stub —— 类/模块级函数/方法/字段 + **可信行号**（块结束逐 token 取，跳过 HIDDEN/INDENT/DEDENT/NEWLINE，实测 `__init__` 的 end 不能信 DEDENT）
 - P4 依赖边（`a7e3c18`）：`PythonImportResolver` import 矩阵（from/别名/相对导入/再导出/星导入/子模块目标），去重、弃自环、弃仓外目标；修正单元 `packageName` 为模块路径
 - P5 框架与角色（`677ffcd`）：`UnitRoleAnnotator` 加 `language()` + `UnitRoleAnnotatorRegistry`（**按语言查表**，解掉"单例 Bean"的架构欠账）；`PythonRoleAnnotator`（装饰器/模块约定/脚本入口）+ 框架识别（Django/Flask/FastAPI，yml 可配）
+- P6 前端 Python 语法高亮（`d6ea309`）：`sourceHighlight.ts` 加 `python` 档案 —— `#` 行注释、`"""`/`'''` 三引号文本块（无块注释，字段改可空）、`@` 装饰器复用注解色、大写=类型 / 小写后跟 `(`=方法、关键字集保持正文色；**零文本损失不变量用 CDP 探针 20/20 实测**（Python 17 项 + Java 回归 3 项）
 - P7 黄金样本验收（3 个样本自选：纯脚本 / Flask / Django），走真实 Spring 上下文 + 真实 yml，行号逐行断言。**端到端实测 `pallets/click`：303 单元 / 3497 边 / 0 失败文件**
+- P8 文档回填：`AGENTS.md` / `TASKBOOK.md` 划掉「Java 以外的解析器」、开放 Python；本 PROGRESS 回填 P6 与前端收尾
 
-后端全量：**单元 337 全绿**（`mvn test`，integration 组默认排除）。
+后端全量：**单元 338 全绿**（`mvn test`，integration 组默认排除）。
+
+## 前端美化收尾（design-taste，第 7 步）
+- 分享页学习路线重排（`ShareController.render` → `renderLearningPath`）：三段式（28px 主色圆号 + 类名 15px 粗 + 右侧分钟 / 第二行 reason 13px 灰）、24px 步距无分隔线无卡片底、默认只展 8 步 +「展开全部」（hidden 切换）、`<768px` 分钟贴类名、类名不伪造链接（快照不含源码）。`ShareControllerTest` 新增 1 单元；CDP 计算样式走查 10/10 符合规格（截图 `docs/screenshots/45-分享页学习路线.png`）
 
 ## 本地运行（已实测通过）
 ```bash

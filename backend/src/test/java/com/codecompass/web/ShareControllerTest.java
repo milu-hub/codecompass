@@ -125,6 +125,37 @@ class ShareControllerTest {
     }
 
     @Test
+    @DisplayName("GET 短链页：学习路线默认只展 8 步，含「共 N 步 · 预计 M 分钟」与「展开全部」，类名不伪造链接")
+    void learningPathRendersCollapsedAndNoFakeLink() throws Exception {
+        StringBuilder path = new StringBuilder();
+        for (int i = 1; i <= 10; i++) {
+            if (i > 1) {
+                path.append(',');
+            }
+            path.append("{\"order\":").append(i)
+                    .append(",\"codeUnitName\":\"Step").append(i)
+                    .append("\",\"reason\":\"第").append(i).append("步原因")
+                    .append("\",\"estimatedMinutes\":5}");
+        }
+        ShareSnapshotEntity entity = new ShareSnapshotEntity("path123456", "https://github.com/a/b",
+                "sha-1",
+                "{\"repoUrl\":\"https://github.com/a/b\",\"commitSha\":\"sha-1\","
+                        + "\"generatedAt\":\"2026-09-18T12:00:00Z\",\"graphMermaid\":\"graph LR\","
+                        + "\"learningPath\":[" + path + "],\"qaSamples\":[],\"achievements\":[],\"notes\":[]}",
+                Instant.parse("2026-10-18T12:00:00Z"), Instant.parse("2026-09-18T12:00:00Z"));
+        when(repository.findById("path123456")).thenReturn(Optional.of(entity));
+
+        String html = mockMvc.perform(get("/share/path123456"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("共 10 步 · 预计 50 分钟");
+        assertThat(html).contains("path-step--extra", "hidden", "path-toggle", "展开全部");
+        assertThat(html).contains("<span class=\"path-name\">Step1</span>");
+        assertThat(html).doesNotContain("<a class=\"path-name\"");
+    }
+
+    @Test
     @DisplayName("旧快照（无 notes 字段）反序列化不炸，笔记段落显示空态")
     void legacySnapshotWithoutNotesStillRenders() throws Exception {
         ShareSnapshotEntity entity = new ShareSnapshotEntity("legacy123456", "https://github.com/a/b",

@@ -126,18 +126,7 @@ public class ShareController {
             body.append("<p>无依赖图</p>");
         }
 
-        body.append("<h2>学习路线</h2>");
-        if (snapshot.learningPath().isEmpty()) {
-            body.append("<p>尚未生成学习路线</p>");
-        } else {
-            body.append("<ol>");
-            for (ShareSnapshot.PathStep step : snapshot.learningPath()) {
-                body.append("<li>").append(escape(step.codeUnitName()))
-                        .append("（约 ").append(step.estimatedMinutes()).append(" 分钟）— ")
-                        .append(escape(step.reason())).append("</li>");
-            }
-            body.append("</ol>");
-        }
+        body.append(renderLearningPath(snapshot));
 
         body.append("<h2>问答记录</h2>");
         if (snapshot.qaSamples().isEmpty()) {
@@ -169,14 +158,88 @@ public class ShareController {
         String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
                 + "<title>CodeCompass 分享</title>"
                 + "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
-                + "<style>body{font-family:sans-serif;max-width:900px;margin:24px auto;padding:0 16px;}"
-                + "pre.mermaid{background:#fafafa;padding:12px;border-radius:6px;overflow:auto;}"
-                + "pre.note{background:#fffbe6;padding:10px;border-radius:6px;white-space:pre-wrap;}"
-                + "footer{margin-top:32px;color:#999;font-size:12px;}</style></head><body>"
+                + "<style>"
+                + "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;"
+                + "color:#1f2a27;max-width:900px;margin:24px auto;padding:0 16px;line-height:1.6;}"
+                + "h1{font-size:22px;font-weight:700;}"
+                + "h2{font-size:17px;font-weight:600;margin-top:36px;}"
+                + "a{color:#0ca678;}"
+                + "pre.mermaid{background:#f7faf9;padding:12px;border-radius:8px;overflow:auto;border:1px solid rgba(220,230,225,.6);}"
+                + "pre.note{background:#fffbe6;padding:10px;border-radius:8px;white-space:pre-wrap;}"
+                + "footer{margin-top:40px;color:#98a6a0;font-size:12px;}"
+                + ".path-meta{font-size:13px;color:#98a6a0;margin:4px 0 20px;}"
+                + ".path-steps{list-style:none;margin:0;padding:0;}"
+                + ".path-step{margin:0 0 24px;padding:0;}"
+                + ".path-step-top{display:flex;align-items:center;gap:12px;}"
+                + ".path-ordinal{flex-shrink:0;width:28px;height:28px;border-radius:50%;"
+                + "background:rgba(12,166,120,.12);color:#0ca678;display:inline-flex;align-items:center;"
+                + "justify-content:center;font-size:13px;font-weight:600;}"
+                + ".path-name{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;font-size:15px;font-weight:600;}"
+                + ".path-minutes{font-size:13px;color:#98a6a0;white-space:nowrap;}"
+                + ".path-step-bottom{padding-left:40px;margin-top:2px;}"
+                + ".path-reason{font-size:13px;color:#66756f;line-height:1.6;}"
+                + ".path-toggle{margin-top:4px;padding:7px 14px;font-size:13px;color:#0ca678;"
+                + "background:rgba(12,166,120,.06);border:1px solid rgba(12,166,120,.28);border-radius:8px;cursor:pointer;}"
+                + ".path-toggle:hover{background:rgba(12,166,120,.12);}"
+                + "@media (max-width:767px){.path-name{flex:0 1 auto;}.path-step-top{flex-wrap:wrap;}}"
+                + "</style></head><body>"
                 + body
                 + "<footer>由 CodeCompass 生成</footer>"
-                + "<script>mermaid.initialize({startOnLoad:true});</script></body></html>";
+                + "<script>mermaid.initialize({startOnLoad:true});</script>"
+                + "<script>(function(){var b=document.getElementById('path-toggle');if(!b)return;"
+                + "b.addEventListener('click',function(){var e=b.getAttribute('data-expanded')!=='1';"
+                + "var s=document.querySelectorAll('.path-step--extra');"
+                + "for(var i=0;i<s.length;i++){if(e){s[i].removeAttribute('hidden');}else{s[i].setAttribute('hidden','');}}"
+                + "b.textContent=e?'收起':'展开全部';b.setAttribute('data-expanded',e?'1':'0');});})();</script>"
+                + "</body></html>";
         return html;
+    }
+
+    /**
+     * 学习路线（第 7 步美化）：三段式 —— 第一行「圆形序号 + 类名 + 右侧预计分钟」，
+     * 第二行缩进到类名下方展示 reason；步间距 24px、无分隔线、无每步卡片底。
+     * 默认只展开前 8 步，超出部分由「展开全部」切换（hidden 属性）。
+     *
+     * <p>类名是否可点击：只有当分享页内嵌源码视图时才能跳转到对应类；本快照刻意不含源码
+     * （FEATURE_SPEC F6 禁止项），所以这里只渲染文本，绝不伪造一个点不动的链接。
+     */
+    private static String renderLearningPath(ShareSnapshot snapshot) {
+        if (snapshot.learningPath().isEmpty()) {
+            return "<h2>学习路线</h2><p>尚未生成学习路线</p>";
+        }
+        int totalMinutes = snapshot.learningPath().stream()
+                .mapToInt(ShareSnapshot.PathStep::estimatedMinutes).sum();
+        StringBuilder html = new StringBuilder();
+        html.append("<h2>学习路线</h2>");
+        html.append("<p class=\"path-meta\">共 ").append(snapshot.learningPath().size())
+                .append(" 步 · 预计 ").append(totalMinutes).append(" 分钟</p>");
+        html.append("<ol class=\"path-steps\">");
+        int index = 0;
+        for (ShareSnapshot.PathStep step : snapshot.learningPath()) {
+            boolean collapsed = index >= 8;
+            html.append("<li class=\"path-step")
+                    .append(collapsed ? " path-step--extra\" hidden" : "\"")
+                    .append(">");
+            html.append("<div class=\"path-step-top\">")
+                    .append("<span class=\"path-ordinal\">").append(step.order()).append("</span>")
+                    .append("<span class=\"path-name\">").append(escape(step.codeUnitName()))
+                    .append("</span>")
+                    .append("<span class=\"path-minutes\">约 ").append(step.estimatedMinutes())
+                    .append(" 分钟</span>")
+                    .append("</div>");
+            html.append("<div class=\"path-step-bottom\">")
+                    .append("<span class=\"path-reason\">").append(escape(step.reason()))
+                    .append("</span>")
+                    .append("</div>");
+            html.append("</li>");
+            index++;
+        }
+        html.append("</ol>");
+        if (snapshot.learningPath().size() > 8) {
+            html.append("<button type=\"button\" id=\"path-toggle\" class=\"path-toggle\"")
+                    .append(" data-expanded=\"0\">展开全部</button>");
+        }
+        return html.toString();
     }
 
     private static String shortSha(String commitSha) {
