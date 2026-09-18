@@ -22,6 +22,8 @@
     <!-- 需要网络的测试打 @Tag("integration")，默认构建排除以保持可离线重复。
          单独运行：mvn test -Dsurefire.excludedGroups= -->
     <surefire.excludedGroups>integration</surefire.excludedGroups>
+    <!-- P1：Python 解析。工具与运行时同版本，语法文件构建期生成，见下方 antlr4-maven-plugin -->
+    <antlr.version>4.13.2</antlr.version>
   </properties>
 
   <dependencies>
@@ -45,6 +47,17 @@
       <groupId>com.github.javaparser</groupId>
       <artifactId>javaparser-core</artifactId>
       <version>3.28.2</version>
+    </dependency>
+
+    <!-- P1：Python 解析（PYTHON_ANALYZER_PLAN.md）。
+         语法来源：antlr/grammars-v4，python/python3_14（Python 3.14.6 官方 PEG 语法改写），
+         MIT License（Copyright (c) 2021 Robert Einhorn），文件按 commit 20efa53 钉死；
+         文件路径与原文出处见 src/main/antlr4/ 与 PythonLexerBase.java 头部。
+         刻意只引 runtime：生成代码在构建期由 antlr4-maven-plugin 产出，不提交。 -->
+    <dependency>
+      <groupId>org.antlr</groupId>
+      <artifactId>antlr4-runtime</artifactId>
+      <version>${antlr.version}</version>
     </dependency>
 
     <!-- ============ T13 MySQL 持久化基础设施（F2/F6 阶段） ============ -->
@@ -98,6 +111,27 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+        </configuration>
+      </plugin>
+
+      <!-- P1：构建期从 src/main/antlr4 生成 PythonLexer / PythonParser。
+           生成物进 target/generated-sources/antlr4（不提交），与 src/main/java 同包同阶段编译，
+           因此 PythonLexerBase.java 放在 src/main/java/com/codecompass/analyzer/python/parser 即可被继承。
+           visitor 打开（P3 的 AST 抽取用）；listener 关掉，少生成一半死代码。 -->
+      <plugin>
+        <groupId>org.antlr</groupId>
+        <artifactId>antlr4-maven-plugin</artifactId>
+        <version>${antlr.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>antlr4</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <visitor>true</visitor>
+          <listener>false</listener>
         </configuration>
       </plugin>
 
