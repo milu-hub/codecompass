@@ -65,7 +65,7 @@ const filtered = computed(() => {
         {{ unit.role }}
       </el-tag>
       <el-tag v-else size="small" type="info" effect="plain">{{ unit.kind }}</el-tag>
-      <span class="class-package">{{ unit.packageName }}</span>
+      <span class="class-package" :title="unit.packageName">{{ unit.packageName }}</span>
     </div>
     <p v-if="filtered.length === 0" class="empty-hint">没有匹配的类</p>
   </div>
@@ -117,10 +117,13 @@ const filtered = computed(() => {
   flex-shrink: 0;
 }
 
-/* 长类名必须能收缩 + 省略号：否则它会把整行顶宽，
-   而 .class-list 的 overflow-y: auto 会让 overflow-x 计算成 auto，一超就冒横向滚动条 */
+/* 长类名：类名**不参与收缩**（flex 的收缩是按「权重 × 基准宽」成比例分摊的，
+   只调权重永远会给类名漏下百分之几，1px 就够触发省略号了）。宽度由 max-width 兜住：
+   扣掉进度点、角色标签和间距，只有真的长过整栏才出省略号，同时保证行内不会顶出横向溢出 */
 .class-name {
   font-weight: 600;
+  flex-shrink: 0;
+  max-width: calc(100% - 104px);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,7 +145,11 @@ const filtered = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 45%;
+  /* 关键：收缩权重给到极大，让包名先把整行让完，类名才不会被挤成省略号。
+     flex 的收缩量是按「权重 × 基准宽度」分摊的，只把包名设成 12 时类名仍会被分到百分之几，
+     于是一样触发 text-overflow: ellipsis。类名自己保留可收缩能力，超长时兜底省略号。
+     这里也不设 max-width：包名只吃类名与标签剩下的那点空间，天然就是次要信息的位置。 */
+  flex-shrink: 100;
 }
 
 .empty-hint {

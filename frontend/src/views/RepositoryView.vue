@@ -135,27 +135,29 @@ async function onSubmit() {
       show-icon
     />
 
-    <!-- 结果区 -->
+    <!-- 结果区：仿 IDE 上下分区 —— 第一行「类列表 + 源码」占满全宽，第二行「依赖图等」整行铺开 -->
     <div v-if="phase === 'done' && graph" class="result-layout">
-      <div class="list-pane cc-glass-card">
-        <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
-        <ClassList
-          :units="graph.codeUnits"
-          :selected-id="selectedUnitId"
-          :filter-text="filterText"
-          :progress="repository.unitProgress"
-          @select="(id: string) => void repository.selectUnit(id)"
-        />
+      <div class="workbench-top">
+        <div class="list-pane cc-glass-card">
+          <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
+          <ClassList
+            :units="graph.codeUnits"
+            :selected-id="selectedUnitId"
+            :filter-text="filterText"
+            :progress="repository.unitProgress"
+            @select="(id: string) => void repository.selectUnit(id)"
+          />
+        </div>
+
+        <div class="source-pane cc-glass-card">
+          <!-- T14：选中类源码（点行选中标识符） -->
+          <SourcePane />
+          <!-- F3：AI 问答（点类提问 + 选中标识符行锚点） -->
+          <QaPanel />
+        </div>
       </div>
 
-      <div class="source-pane cc-glass-card">
-        <!-- T14：选中类源码（点行选中标识符） -->
-        <SourcePane />
-        <!-- F3：AI 问答（点类提问 + 选中标识符行锚点） -->
-        <QaPanel />
-      </div>
-
-      <!-- T24：右栏统一 Tab —— 图 / 学习路线 / 测验 / 笔记 / 成就 -->
+      <!-- T24：右栏统一 Tab —— 图 / 学习路线 / 测验 / 笔记 / 成就（下沉为整行） -->
       <div class="right-pane cc-glass-card">
         <el-tabs v-model="rightTab" class="cc-glass-tabs">
           <el-tab-pane label="依赖图" name="graph">
@@ -268,42 +270,57 @@ async function onSubmit() {
   margin-top: 16px;
 }
 
-/* 工作台：三栏等高、撑满窗口剩余高度，各自内部滚动（IDE 式，不让整页滚动） */
+/* 工作台：仿 IDE 上下两区，撑满窗口剩余高度，各自内部滚动（不让整页滚动）
+   第一行 = 类列表（资源管理器）+ 源码（编辑器），占满全宽；
+   第二行 = 依赖图/学习路线/测验/笔记/成就，整行铺开（图在窄栏里根本画不开）。
+
+   高度分配：先把可用高度算出来，再切一块给下图区，剩下的全归编辑器。
+   min-height 用「上图最少 360 + 间隙 16 + 下图最少 220」兜底：窗口不够高时宁可整页滚一点，
+   也不把编辑器压成几行（实测 1280×800 下不兜底的话编辑器只剩 6 行，比改之前还差）。 */
 .result-layout {
   display: flex;
+  flex-direction: column;
   gap: 16px;
   margin-top: 16px;
-  align-items: stretch;
-  height: calc(100dvh - 252px);
-  min-height: 460px;
+  height: calc(100dvh - 222px);
+  min-height: 596px;
 }
 
-/* 三栏各自成一张玻璃卡片（.cc-glass-card 提供材质，这里只管尺寸与内衬） */
+.workbench-top {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  min-height: 360px;
+  align-items: stretch;
+}
+
+/* 第一行：类列表栏宽到能显示完整类名（包名让位，优先保住类名） */
 .list-pane {
   display: flex;
   flex-direction: column;
-  width: 300px;
+  width: 348px;
   flex-shrink: 0;
   min-height: 0;
   padding: 12px;
 }
 
-/* 源码栏明显大于右侧信息栏：它是主工作面，按 IDE 阅读区给宽度 */
+/* 源码栏吃掉第一行剩下的全部宽度 */
 .source-pane {
-  display: flex;
-  flex-direction: column;
-  flex: 1.6 1 0;
-  min-width: 0;
-  min-height: 0;
-  padding: 12px;
-}
-
-.right-pane {
   display: flex;
   flex-direction: column;
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+  padding: 12px;
+}
+
+/* 第二行：整行铺开，高度按视口比例给（下限 220 / 上限 320） */
+.right-pane {
+  display: flex;
+  flex-direction: column;
+  height: clamp(220px, 26%, 320px);
+  flex-shrink: 0;
+  min-width: 0;
   padding: 12px;
 }
 

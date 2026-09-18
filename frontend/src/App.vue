@@ -54,8 +54,9 @@ onMounted(() => {
 
 .app-footer {
   text-align: center;
-  margin-top: 24px;
-  padding: 12px;
+  /* 页脚只是连通性一行字，别占掉工作台的高度 */
+  margin-top: 12px;
+  padding: 8px;
   color: #909399;
 }
 </style>
