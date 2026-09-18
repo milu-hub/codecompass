@@ -1,0 +1,59 @@
+/**
+ * CodeCompass 页面级样式（全局）。
+ *
+ * 定位：**工具型 SPA**，不是 landing page —— 只做页面底座（背景/中性色/字体/圆角令牌），
+ * 不做 hero、不做滚动动画、不做粒子效果。
+ *
+ * 设计读法：开发者工具，冷静临床的"雾面纸"质感；单一主色 #0CA678 全站锁定，
+ * 中性色统一偏冷绿（#66756F / #98A6A0 / #DCE6E1），圆角规则 = 卡片 16px /
+ * 交互行 8px / 徽章正圆 / 输入框 8px。
+ */
+
+:root {
+  /* 主色（全站唯一强调色，锁定） */
+  --cc-accent: #0ca678;
+  --cc-accent-strong: #12b886;
+  --cc-accent-soft: rgba(12, 166, 120, 0.12);
+  --cc-accent-tint: rgba(12, 166, 120, 0.06);
+
+  /* 中性色（统一冷绿调，不混暖灰） */
+  --cc-ink: #1f2a27;
+  --cc-text-muted: #66756f;
+  --cc-text-faint: #98a6a0;
+  --cc-line: rgba(220, 230, 225, 0.6);
+
+  /* 圆角规则（Shape Consistency Lock） */
+  --cc-radius-card: 16px;
+  --cc-radius-row: 8px;
+  --cc-radius-input: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100dvh;
+  color: var(--cc-ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+
+  /* T24 之后的美化第一步：三层柔和光晕 + 一层微渐变，作为毛玻璃的底座。
+     background-attachment: fixed 让光晕不随内容滚动，毛玻璃才有稳定的折射底色。 */
+  background-color: #f7fbf9;
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(12, 166, 120, 0.1), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(34, 139, 230, 0.08), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(12, 166, 120, 0.06), transparent 50%),
+    linear-gradient(135deg, #f4faf7, #ffffff 45%, #edf6f2);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
