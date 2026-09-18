@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRepositoryStore } from '../stores/repository'
 import { fetchSource } from '../api/repos'
 import type { SourceView } from '../api/repos'
+import { highlightSource } from '../utils/sourceHighlight'
 
 /**
  * T14 源码面板：展示选中类的源码行（行号为真实文件行号），点击行即选中标识符：
@@ -46,6 +47,17 @@ watch(
 
 const selectedUnit = () =>
   graph.value?.codeUnits.find((unit) => unit.id === selectedUnitId.value) ?? null
+
+/**
+ * 着色结果按整段源码一次算（块注释/文本块要跨行），并缓存到 source 变化为止。
+ * 着色只影响颜色：token 文本拼接 === 原行文本（见 utils/sourceHighlight.ts 的约束）。
+ */
+const highlighted = computed(() => {
+  if (!source.value) {
+    return [] as ReturnType<typeof highlightSource>
+  }
+  return highlightSource(source.value.language, source.value.lines)
+})
 
 function isSelectedLine(lineNumber: number): boolean {
   if (!selection.value) {
@@ -119,7 +131,8 @@ function onLineClick(lineNumber: number, lineText: string) {
         @click="onLineClick(source.startLine + index, line)"
       >
         <span class="line-number">{{ source.startLine + index }}</span>
-        <span class="line-text">{{ line || ' ' }}</span>
+        <span v-if="!line" class="line-text">{{ ' ' }}</span>
+        <span v-else class="line-text"><span v-for="(token, tokenIndex) in highlighted[index]" :key="tokenIndex" :class="`code-${token.kind}`">{{ token.text }}</span></span>
       </div>
     </div>
     <p v-else-if="!sourceError && !selectedUnitId" class="source-loading">
@@ -148,9 +161,11 @@ function onLineClick(lineNumber: number, lineText: string) {
   font-weight: 600;
 }
 
+/* 文件路径：等宽字体 + 中性色（第四步） */
 .source-file {
   font-size: 12px;
-  color: #909399;
+  color: var(--cc-text-muted);
+  font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -158,7 +173,7 @@ function onLineClick(lineNumber: number, lineText: string) {
 
 .selection-hint {
   font-size: 12px;
-  color: #409eff;
+  color: var(--cc-text-muted);
 }
 
 .code-viewer {
@@ -166,9 +181,9 @@ function onLineClick(lineNumber: number, lineText: string) {
   min-height: 0;
   max-height: 420px;
   overflow: auto;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  background: #fafafa;
+  border: 1px solid var(--cc-code-line);
+  border-radius: var(--cc-radius-row);
+  background: var(--cc-code-bg);
   font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
   font-size: 13px;
 }
@@ -179,21 +194,24 @@ function onLineClick(lineNumber: number, lineText: string) {
 }
 
 .code-line:hover {
-  background: #f0f7ff;
+  background: var(--cc-code-line-hover);
 }
 
+/* 当前选中行（含方法/属性的整段范围） */
 .code-line.selected {
-  background: #d9ecff;
+  background: var(--cc-code-line-active);
 }
 
+/* 行号：固定宽度 + 右对齐，与代码之间一条 1px 分隔线 */
 .line-number {
   flex-shrink: 0;
   width: 48px;
   padding-right: 8px;
   text-align: right;
-  color: #c0c4cc;
+  font-size: 12px;
+  color: var(--cc-code-gutter);
   user-select: none;
-  border-right: 1px solid #ebeef5;
+  border-right: 1px solid var(--cc-code-line);
   margin-right: 8px;
 }
 
@@ -201,8 +219,29 @@ function onLineClick(lineNumber: number, lineText: string) {
   white-space: pre;
 }
 
+/* 5 类语法色（关键字刻意保持正文色，不引入第 6 种色相） */
+.code-annotation {
+  color: var(--cc-code-annotation);
+}
+
+.code-type {
+  color: var(--cc-code-type);
+}
+
+.code-method {
+  color: var(--cc-code-method);
+}
+
+.code-string {
+  color: var(--cc-code-string);
+}
+
+.code-comment {
+  color: var(--cc-code-comment);
+}
+
 .source-loading {
-  color: #909399;
+  color: var(--cc-text-faint);
   font-size: 13px;
 }
 </style>

@@ -37,6 +37,18 @@
   --cc-glass-line: rgba(220, 230, 225, 0.5);
   --cc-glass-line-strong: rgba(220, 230, 225, 0.8);
   --cc-glass-shadow: 0 8px 32px rgba(31, 42, 39, 0.06);
+
+  /* 源码区令牌（第四步）：底色/分隔线/行号/当前行 + 5 类语法色 */
+  --cc-code-bg: rgba(247, 250, 249, 0.6);
+  --cc-code-line: rgba(220, 230, 225, 0.6);
+  --cc-code-gutter: rgba(102, 117, 111, 0.5);
+  --cc-code-line-active: rgba(12, 166, 120, 0.08);
+  --cc-code-line-hover: rgba(12, 166, 120, 0.05);
+  --cc-code-annotation: #0ca678;
+  --cc-code-type: #1976d2;
+  --cc-code-method: #7b4bd6;
+  --cc-code-string: #2b8a3e;
+  --cc-code-comment: #98a6a0;
 }
 
 * {
