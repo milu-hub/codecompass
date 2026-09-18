@@ -77,11 +77,12 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- MyBatis-Plus（规格书允许的 JPA 路线为备选，见 T13 预研记录） -->
+    <!-- MyBatis-Plus 预研结论（2026-09-18）：3.5.12 的自动配置走 spring.factories，
+         Spring Boot 4 已弃用该机制 → SqlSessionFactory Bean 静默缺失（实测 NoSuchBean）。
+         按规格书「MyBatis-Plus（或 JPA）」条款切换 JPA 路线（FlywayMigrationTest 钉死）。 -->
     <dependency>
-      <groupId>com.baomidou</groupId>
-      <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-      <version>3.5.12</version>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
     </dependency>
   </dependencies>
 
