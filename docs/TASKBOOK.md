@@ -41,11 +41,13 @@
 | 问答行号 | 必须基于检索到的代码片段，不允许 LLM 自己编行号 |
 | 引用格式 | references 每条记录带 `file`、`startLine`、`endLine`、`language` |
 
-### 第一版不做（写死，不讨论）
+
+### 第一版不做（F1/F3 阶段）
+
+> **注**：以下限制仅适用于 F1/F3 阶段。F2/F4/F5/F6 阶段已解除，以 `FEATURE_SPEC_F2_F6.md` 为准。
+
 - Java 以外的解析器实现（Python / Go / TypeScript 等只预留接口）
-- 学习路线、自动测验、笔记、成就、分享页
 - 登录 / JWT / Spring Security
-- MySQL / MyBatis / JPA
 - Redis（MVP 用内存缓存）
 - Spoon、向量数据库、方法级调用图
 - GitHub stars / 语言分布等元数据展示
