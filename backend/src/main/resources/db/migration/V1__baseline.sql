@@ -91,9 +91,11 @@ CREATE INDEX idx_user_actions_client_action ON user_actions (client_id, action, 
 
 -- 缓存表（T13 追加）：CacheService 的 MySQL 落点。
 -- value_json 是通用命名 —— 现在存 AnswerResponse，将来 F2/F4 的缓存结果也进这张表。
+-- 类型刻意用 TEXT 而非 JSON：H2 的 JSON 列 getString 返回带外层引号的文本、
+-- getObject 返回 byte[]，跨库读取不稳；缓存值由 Jackson 序列化，不需要列级校验。
 CREATE TABLE cache_entries (
   cache_key VARCHAR(64) PRIMARY KEY,
-  value_json JSON NOT NULL,
+  value_json TEXT NOT NULL,
   expires_at DATETIME NOT NULL,
   created_at DATETIME NOT NULL
 );

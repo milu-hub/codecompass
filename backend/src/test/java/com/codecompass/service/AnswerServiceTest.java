@@ -11,6 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import com.codecompass.analyzer.AnalyzeResult;
 import com.codecompass.analyzer.CodeUnitInfo;
@@ -44,14 +46,25 @@ class AnswerServiceTest {
 
     private LlmClient llmClient;
     private AnswerService service;
-    private InMemoryCacheService cacheService;
+    private CacheService cacheService;
     private InMemoryRateLimiter rateLimiter;
 
     @BeforeEach
     void setUp() {
         llmClient = Mockito.mock(LlmClient.class);
-        cacheService = new InMemoryCacheService(new MutableClock(Instant.parse("2026-09-18T00:00:00Z")),
-                new CacheProperties());
+        // T13 回归：缓存走 MysqlCacheService（H2 MODE=MySQL 落点）——切 Bean 即换实现的真实闸门
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(new DriverManagerDataSource(
+                "jdbc:h2:mem:answer-service-test;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""));
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS cache_entries (
+                  cache_key VARCHAR(64) PRIMARY KEY,
+                  value_json TEXT NOT NULL,
+                  expires_at DATETIME NOT NULL,
+                  created_at DATETIME NOT NULL
+                )""");
+        jdbcTemplate.execute("DELETE FROM cache_entries");
+        cacheService = new MysqlCacheService(jdbcTemplate, JsonMapper.builder().build(),
+                new MutableClock(Instant.parse("2026-09-18T00:00:00Z")), new CacheProperties());
         rateLimiter = new InMemoryRateLimiter(new MutableClock(Instant.parse("2026-09-18T00:00:00Z")),
                 new RateLimitProperties());
         service = new AnswerService(

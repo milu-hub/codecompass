@@ -116,7 +116,8 @@ F5 的成就在这张表上计数，不依赖内存。
 ```sql
 CREATE TABLE cache_entries (
   cache_key VARCHAR(64) PRIMARY KEY,  -- CacheKey 四组件（commitSha/文件/问题hash/模型）的 hash
-  value_json JSON NOT NULL,           -- 缓存值：现在存 AnswerResponse，将来 F2/F4 共用
+  value_json TEXT NOT NULL,           -- 缓存值：现在存 AnswerResponse，将来 F2/F4 共用。
+                                      -- 刻意 TEXT 而非 JSON（H2 的 JSON 列跨库读取不稳，见 V1 注释）
   expires_at DATETIME NOT NULL,       -- TTL 惰性清理
   created_at DATETIME NOT NULL,
   INDEX idx_cache_expires (expires_at)

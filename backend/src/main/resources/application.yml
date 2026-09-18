@@ -112,10 +112,12 @@ codecompass:
     timeout: 60s
     max-attempts: 3
 
-  # T11：问答缓存与限流（纯内存，MVP 无 Redis）。缓存只存问答结果，不存仓库代码。
+  # T11：问答缓存与限流。T13 起缓存默认落 MySQL（MysqlCacheService，见 SCHEMA_F2_F6.md
+  # 的 cache_entries）；storage=memory 切回内存版。缓存只存问答结果，不存仓库代码。
   cache:
+    storage: mysql
     ttl: 1h
-    max-size: 500
+    max-size: 500   # 仅内存实现使用（容量上限）；MySQL 实现按 TTL 惰性清理，容量语义延后
   rate-limit:
     # 按匿名身份（X-Client-Id → X-Forwarded-For → IP）的自然日 token 上限
     daily-token-limit: 100000
