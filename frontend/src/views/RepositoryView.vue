@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRepositoryStore } from '../stores/repository'
 import ClassList from '../components/ClassList.vue'
 import DependencyGraphPane from '../components/DependencyGraphPane.vue'
+import QaPanel from '../components/QaPanel.vue'
 
 const repository = useRepositoryStore()
 const {
@@ -111,6 +112,8 @@ async function onSubmit() {
         <p v-if="graph.isolatedCodeUnitIds.length > 0" class="isolated-hint">
           另有 {{ graph.isolatedCodeUnitIds.length }} 个类没有依赖关系，未画进图
         </p>
+        <!-- F3：AI 问答（后端 T10 /ask，点类提问带锚点） -->
+        <QaPanel />
       </div>
     </div>
   </el-card>

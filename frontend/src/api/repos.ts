@@ -65,3 +65,23 @@ export function fetchGraph(taskId: string, unitId?: string): Promise<GraphRespon
   const query = unitId ? `?unit=${encodeURIComponent(unitId)}&depth=1` : ''
   return getJson<GraphResponse>(`/api/repos/${taskId}/graph${query}`)
 }
+
+// ---------- T10 问答 ----------
+
+export interface AskReference {
+  file: string
+  language: string
+  startLine: number
+  endLine: number
+}
+
+export interface AskResponse {
+  answer: string
+  references: AskReference[]
+  model: string
+}
+
+/** unitId 是 §S7「点击某个类提问」的锚点；null 时后端按关键词检索。 */
+export function askQuestion(taskId: string, question: string, unitId: string | null): Promise<AskResponse> {
+  return postJson<AskResponse>(`/api/repos/${taskId}/ask`, { question, unitId })
+}

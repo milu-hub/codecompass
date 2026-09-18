@@ -1,0 +1,5 @@
+# IDE 本地配置
+.idea/
+
+# 运行演示截图（临时产物，不进版本库）
+docs/screenshots/
