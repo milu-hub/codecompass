@@ -75,23 +75,55 @@ const filtered = computed(() => {
 .class-list {
   max-height: 640px;
   overflow-y: auto;
+  /* hover 行有 translateX(2px)：不锁死横向，行右移 2px 会顶出横向滚动条 */
+  overflow-x: hidden;
 }
 
 .class-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-radius: 4px;
+  /* 第二步之后：行默认透明，让玻璃卡片的底透上来；圆角按「交互行 8px」规则 */
+  border-radius: var(--cc-radius-row);
   cursor: pointer;
+  background: transparent;
+  transition:
+    background-color 0.16s ease,
+    transform 0.16s ease;
 }
 
 .class-row:hover {
-  background: #f5f7fa;
+  background: var(--cc-accent-tint);
+  transform: translateX(2px);
 }
 
 .class-row.selected {
-  background: #ecf5ff;
+  background: var(--cc-accent-soft);
+}
+
+/* 选中态：左侧 3px 主色竖条（上下各内缩 8px，避免顶到圆角） */
+.class-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--cc-accent);
+}
+
+/* 尊重「减弱动效」：位移关掉，保留背景变化 */
+@media (prefers-reduced-motion: reduce) {
+  .class-row {
+    transition: background-color 0.16s ease;
+  }
+
+  .class-row:hover {
+    transform: none;
+  }
 }
 
 .class-name {
