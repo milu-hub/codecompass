@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-无 —— MVP 按 T0～T12 全部交付，验收见 `docs/T12-验收报告.md`
+T13 MySQL 持久化基础设施（F2/F6 阶段，需求来源 FEATURE_SPEC_F2_F6.md）
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 245 + 集成 21 = 266，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 252 + 集成 23 = 275，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -169,8 +169,14 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：**踩坑 —— PowerShell 5.1 的 Get-Content/Set-Content 默认按系统 GBK 读写，会把 UTF-8 测试源码的中文整批变成乱码**。教训：改含中文的源文件一律用 edit/write 工具，绝不在 PowerShell 里做文本回写（本次已用 write 全量重写恢复，未造成提交污染）
 - 2026-09-18：**T13 LlmConfig 模型**：`default` 是 Java 保留字 → 字段名 `isDefault`；provider 是元数据标签不参与路由（协议统一 OpenAI 兼容）；apiKey 明文只限服务内部使用，日志/异常禁打印 config 对象，未来对外端点必须脱敏
 - 2026-09-18：**T13 switch/save/delete 显式抛 UnsupportedOperationException**（「配置以 application.yml 为准」）——客户端是启动时用默认配置构建的单例，假装支持运行时切换会交付悄悄失效的功能；真切换需要「客户端按请求解析配置」，留给未来多配置版本。问答链路（AnswerService/LlmClient 接口/检索/校验/限流）零改动，唯一触碰点是客户端配置来源
+- 2026-09-18：**T13 预研实锤 —— MyBatis-Plus 3.5.12 与 Boot 4 不兼容**：其自动配置走 spring.factories，Boot 4 已弃用该机制 → SqlSessionFactory Bean 静默缺失（FlywayMigrationTest 的 @Autowired 实测 NoSuchBean）。按规格书「（或 JPA）」条款切换 `spring-boot-starter-data-jpa`，并以「EntityManagerFactory Bean 存在」断言防同类静默失效复发
+- 2026-09-18：**H2 的 JSON 列是坑**：getObject 返回 byte[]、getString 返回带外层引号的文本（实测），跨库读取不稳 → cache_entries.value_json 用 TEXT（缓存值由 Jackson 序列化，无需列级校验）；规格 8 张业务表的 JSON 列留给 JPA/Hibernate 层处理
+- 2026-09-18：**迁移脚本双通纪律**：H2(MODE=MySQL) 与 MySQL 8 共用同一套 V1，只用方言交集（AUTO_INCREMENT/DATETIME/JSON/TEXT + 独立 CREATE INDEX，不写 ENGINE/UNIQUE KEY 行内子句）；upsert 用 `ON DUPLICATE KEY UPDATE ... VALUES()`（H2 MySQL 模式支持，MySQL 8 中弃用但可用）
+- 2026-09-18：**size() 澄清落地**：size() 自 T11 起就在 CacheService 接口里（接口未做任何改动），MysqlCacheService 按接口实现（只数未过期行，与内存版「存活条目」语义对齐）；测试计数按用户要求用 JdbcTemplate 直查 cache_entries
+- 2026-09-18：**T13 运行态证据**：后端带 DB_URL 启动 → Flyway 真迁移 codecompass 库；真实问答 3342ms 后 cache_entries 出现该问缓存行；同问 14ms 命中且答案逐字一致；集成套件写入的问答缓存与运行 app 共享同一张表（跨进程持久化实锤）。**T11 的串行教训再次应验**（集成套件与运行 jar 并行时克隆 409），此后一律串行
 - 2026-09-18：**完整真实运行（全链路走查 + 全套测试）**：257 全绿（单元 236 + 集成 21，含真实 LLM 20 问、3 黄金样本、覆盖率 144/144）。经 Vite 代理走查：petclinic 25 单元/21 边、邻域 1 边、真实问答 2413ms 带 2 引用、**同问缓存命中 9ms（约 270 倍）答案逐字一致**、新问引用 94-122 即 processFindForm；第三样本 180 单元/80 边/0 失败文件，跨模块问答引用 CalcController+CalcService 正确
 - 2026-09-18：**环境坑 ×2**：① Vite 8 的 dev server 只绑 IPv6 `::1` —— `127.0.0.1:5173` 连不上、`localhost:5173` 正常，验收脚本一律用 localhost；② 昨天遗留的 Vite 僵尸进程占着 5173 且无响应（端口在监听、请求被拒），新实例被挤到 5174 —— 先清僵尸再重启才能回到标准端口
 - 2026-09-18：**F3 前端问答窗口**（`QaPanel.vue`）：提问带当前选中类为锚点、无选中退化为关键词检索；答案原文展示 + 引用标签点击定位到对应类（邻域图随之切换）；错误（409/429/502）展示后端原文；切换任务清空问答区。后端零改动，纯前端增量。真实浏览器走查（CDP 驱动 + 真实 DeepSeek）：锚点正确 → 回答上屏 → 5 条引用 → 点击引用后图标题切换为被引用类 ✓
 - 2026-09-18：新增根 `.gitignore`（`.idea/`、`docs/screenshots/`）——截图是演示产物不进版本库；此前无根级 .gitignore，靠 `git add -A` 提交时已小心避让
 - 2026-09-18：**T14 源码可见 + 选中标识符提问**：后端 `GET /{id}/source?unit=`（T7 内存快照的**单类切片**，非仓库转储 —— §07「不公开大段源码」的边界解读：整仓库倾倒禁止、单类按需取阅是 S7 引用验证的产品本职）；`AskRequest` 加 `anchorStartLine/anchorEndLine` 行锚点，AnswerService 把选中范围切成「【聚焦】片段」置顶进提示词（范围钳制在单元内、unitId 未知退化为普通检索）；**行锚点提问不走缓存**（行号参与语义，CacheKey 不含行号会错命中）。`UnitView` 增 methods/fields 供前端吸附。前端三栏布局（类列表 | 源码+问答 | 图），点源码行自动吸附到所在方法（字段按声明行匹配）。真实走查：点第 95 行 → 「方法 processFindForm（94-122 行）」→ DeepSeek 回答逐行引用方法内代码 ✓。新增单元 9（AnswerService 4 + 控制器 5）
+- T13（F2/F6 阶段）MySQL 持久化基础设施：Flyway 12（starter-flyway + flyway-mysql）V1 基线 9 表（规格 8 表 + cache_entries）、`spring.datasource.*` 走 DB_URL/DB_USER/DB_PASSWORD 环境变量（缺省回落 H2）、`MysqlCacheService`（JdbcTemplate + 注入 JsonMapper，默认启用；InMemoryCacheService 保留于 storage=memory）。**MyBatis-Plus 预研失败 → JPA 路线**。新增单元 7（FlywayMigrationTest 2 + MysqlCacheServiceTest 5）+ 集成 2（真 MySQL 双闸）
