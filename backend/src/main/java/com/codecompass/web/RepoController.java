@@ -20,12 +20,15 @@ import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
 import com.codecompass.service.LlmException;
+import com.codecompass.service.RateLimitExceededException;
 import com.codecompass.web.dto.AnalysisTaskView;
 import com.codecompass.web.dto.AskRequest;
 import com.codecompass.web.dto.CreateRepoRequest;
 import com.codecompass.web.dto.ErrorResponse;
 import com.codecompass.web.dto.GraphResponse;
 import com.codecompass.web.dto.NotReadyResponse;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * T7：图数据 REST API。T10 加问答端点。
@@ -108,10 +111,11 @@ public class RepoController {
      * T10 问答。答案只能基于 T9 的检索片段；LLM 报出的引用逐条与片段比对（AnswerService 内）。
      *
      * <p>状态语义：未知 404；未完成 409（failed 时携带 errorMessage）；
-     * LLM 通道故障 502（answer 根本不存在，不降级 200）。
+     * 超限 429（T11 每日 token 上限）；LLM 通道故障 502（answer 根本不存在，不降级 200）。
      */
     @PostMapping("/{taskId}/ask")
-    public ResponseEntity<?> ask(@PathVariable String taskId, @RequestBody AskRequest request) {
+    public ResponseEntity<?> ask(@PathVariable String taskId, @RequestBody AskRequest request,
+                                 HttpServletRequest servletRequest) {
         String question = request == null ? null : request.question();
         if (question == null || question.isBlank()) {
             return ResponseEntity.badRequest().body(new ErrorResponse("问题不能为空"));
@@ -131,9 +135,30 @@ public class RepoController {
                     .body(new NotReadyResponse(taskId, snapshot.status(), message));
         }
         try {
-            return ResponseEntity.ok(answerService.ask(snapshot, question, unitId));
+            return ResponseEntity.ok(answerService.ask(
+                    snapshot, question, unitId, resolveClientKey(servletRequest)));
+        } catch (RateLimitExceededException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(new ErrorResponse(e.getMessage()));
         } catch (LlmException e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(e.getMessage()));
         }
+    }
+
+    /**
+     * 匿名身份解析：{@code X-Client-Id}（匿名 session）→ {@code X-Forwarded-For} 首跳 →
+     * {@code remoteAddr}。只读 remoteAddr 的话，dev 经 Vite 代理、生产经反代，
+     * 所有请求都来自 127.0.0.1，限流会变成全站共享一个额度。
+     */
+    static String resolveClientKey(HttpServletRequest request) {
+        String clientId = request.getHeader("X-Client-Id");
+        if (clientId != null && !clientId.isBlank()) {
+            return clientId.trim();
+        }
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

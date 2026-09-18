@@ -28,7 +28,9 @@ public class AnswerConfiguration {
 
     @Bean
     public AnswerService answerService(CodeRetriever retriever, LlmClient llmClient,
-                                       LlmProperties properties, JsonMapper jsonMapper) {
-        return new AnswerService(retriever, llmClient, properties, jsonMapper);
+                                       LlmProperties properties, JsonMapper jsonMapper,
+                                       CacheService cacheService, RateLimiter rateLimiter) {
+        return new AnswerService(retriever, llmClient, properties, jsonMapper,
+                cacheService, rateLimiter);
     }
 }

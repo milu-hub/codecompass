@@ -18,17 +18,25 @@ import com.codecompass.graph.GraphNode;
 import com.codecompass.repo.GitRepositoryCloner;
 import com.codecompass.retrieve.LexicalCodeRetriever;
 import com.codecompass.retrieve.RetrieveProperties;
+import com.codecompass.service.AnswerResponse;
 import com.codecompass.service.AnswerService;
 import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
+import com.codecompass.service.CacheProperties;
+import com.codecompass.service.InMemoryCacheService;
+import com.codecompass.service.InMemoryRateLimiter;
 import com.codecompass.service.LlmClient;
 import com.codecompass.service.LlmException;
 import com.codecompass.service.LlmProperties;
+import com.codecompass.service.RateLimitProperties;
+import com.codecompass.testutil.MutableClock;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -46,6 +54,7 @@ class RepoControllerTest {
     private AnalysisTaskStore store;
     private GitRepositoryCloner cloner;
     private LlmClient llmClient;
+    private RateLimitProperties rateLimitProperties;
     private MockMvc mockMvc;
     private String seededTaskId;
 
@@ -61,9 +70,14 @@ class RepoControllerTest {
                 .thenAnswer(invocation -> store.create(invocation.getArgument(0)));
 
         llmClient = Mockito.mock(LlmClient.class);
+        rateLimitProperties = new RateLimitProperties();
         AnswerService answerService = new AnswerService(
                 new LexicalCodeRetriever(new RetrieveProperties()),
-                llmClient, new LlmProperties(), JsonMapper.builder().build());
+                llmClient, new LlmProperties(), JsonMapper.builder().build(),
+                new InMemoryCacheService(new MutableClock(java.time.Instant.parse("2026-09-18T00:00:00Z")),
+                        new CacheProperties()),
+                new InMemoryRateLimiter(new MutableClock(java.time.Instant.parse("2026-09-18T00:00:00Z")),
+                        rateLimitProperties));
 
         mockMvc = MockMvcBuilders.standaloneSetup(new RepoController(
                 cloner, orchestrator, store,
@@ -299,6 +313,92 @@ class RepoControllerTest {
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error")
                         .value(org.hamcrest.Matchers.containsString("LLM 未配置")));
+    }
+
+    // ---------- POST /api/repos/{id}/ask（T11：限流与身份解析） ----------
+
+    @Test
+    @DisplayName("ask 超限：429 + 明确错误，且不触达 LLM")
+    void askWhenRateLimitedReturns429() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+        rateLimitProperties.setDailyTokenLimit(1);
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"OwnerController\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error")
+                        .value(org.hamcrest.Matchers.containsString("token 上限")));
+
+        Mockito.verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    @DisplayName("clientKey 优先取 X-Client-Id 请求头")
+    void clientKeyPrefersXClientIdHeader() throws Exception {
+        AnswerService answerService = Mockito.mock(AnswerService.class);
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString()))
+                .thenReturn(new AnswerResponse("A", List.of(), "gpt-4o-mini"));
+        MockMvc custom = controllerWith(answerService);
+        String taskId = doneTaskId();
+
+        custom.perform(post("/api/repos/" + taskId + "/ask")
+                        .header("X-Client-Id", "anon-session-42")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isOk());
+
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("anon-session-42"));
+    }
+
+    @Test
+    @DisplayName("无 X-Client-Id 时回落到 remoteAddr")
+    void clientKeyFallsBackToRemoteAddr() throws Exception {
+        AnswerService answerService = Mockito.mock(AnswerService.class);
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString()))
+                .thenReturn(new AnswerResponse("A", List.of(), "gpt-4o-mini"));
+        MockMvc custom = controllerWith(answerService);
+        String taskId = doneTaskId();
+
+        custom.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isOk());
+
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("127.0.0.1"));
+    }
+
+    @Test
+    @DisplayName("X-Forwarded-For 取第一跳（反代场景）")
+    void clientKeyUsesForwardedForFirstHop() throws Exception {
+        AnswerService answerService = Mockito.mock(AnswerService.class);
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString()))
+                .thenReturn(new AnswerResponse("A", List.of(), "gpt-4o-mini"));
+        MockMvc custom = controllerWith(answerService);
+        String taskId = doneTaskId();
+
+        custom.perform(post("/api/repos/" + taskId + "/ask")
+                        .header("X-Forwarded-For", "203.0.113.7, 10.0.0.1")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isOk());
+
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("203.0.113.7"));
+    }
+
+    private MockMvc controllerWith(AnswerService answerService) {
+        return MockMvcBuilders.standaloneSetup(new RepoController(
+                cloner, Mockito.mock(AnalysisOrchestrator.class), store,
+                new com.codecompass.graph.DependencyGraphBuilder(
+                        new com.codecompass.graph.MermaidRenderer()),
+                answerService)).build();
+    }
+
+    private String doneTaskId() {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+        return taskId;
     }
 
     // ---------- helpers ----------

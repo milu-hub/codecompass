@@ -1,6 +1,10 @@
 package com.codecompass.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -8,6 +12,7 @@ import java.util.OptionalInt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codecompass.analyzer.CodeUnitInfo;
 import com.codecompass.retrieve.CodeRetriever;
 import com.codecompass.retrieve.RetrievedSnippet;
 
@@ -17,11 +22,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * T10 问答编排：检索（T9）→ 拼提示词 → LLM → 解析 → 引用逐条校验 → 不匹配丢弃重试。
+ * T10 问答编排 + T11 缓存与限流：缓存 → 检索（T9）→ 限流 → 拼提示词 → LLM →
+ * 解析 → 引用逐条校验 → 不匹配丢弃重试。
  *
  * <p><b>行号只来自检索层</b>：提示词里每行前缀真实行号，LLM 报出的引用逐条与检索片段
  * 做严格包含比对，不匹配的丢弃、带反馈重试（预算 {@code maxAttempts} 封顶）。
  * 传输类错误不进重试循环，直接以 {@link LlmException} 向上（控制器 → 502）。
+ *
+ * <p><b>T11 顺序是正确性的一部分</b>：缓存命中排在限流之前 —— 命中零 LLM 消耗，
+ * 不该烧配额；限流排在 LLM 之前 —— 超限绝不触达 LLM。commitSha 缺失时不查不写缓存
+ * （宁可 miss 不可错命中）。
  */
 public class AnswerService {
 
@@ -42,19 +52,33 @@ public class AnswerService {
     private final LlmClient llmClient;
     private final LlmProperties properties;
     private final JsonMapper lenientMapper;
+    private final CacheService cacheService;
+    private final RateLimiter rateLimiter;
 
     public AnswerService(CodeRetriever retriever, LlmClient llmClient,
-                         LlmProperties properties, JsonMapper jsonMapper) {
+                         LlmProperties properties, JsonMapper jsonMapper,
+                         CacheService cacheService, RateLimiter rateLimiter) {
         this.retriever = retriever;
         this.llmClient = llmClient;
         this.properties = properties;
+        this.cacheService = cacheService;
+        this.rateLimiter = rateLimiter;
         // 宽松实例只管解析 LLM 输出（常带结尾杂字符），不动全局 Bean —— T0 钉死的决策
         this.lenientMapper = jsonMapper.rebuild()
                 .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                 .build();
     }
 
-    public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question, String unitId) {
+    public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question,
+                              String unitId, String clientKey) {
+        CacheKey cacheKey = cacheKeyFor(snapshot, question, unitId);
+        if (cacheKey != null) {
+            Optional<AnswerResponse> cached = cacheService.get(cacheKey);
+            if (cached.isPresent()) {
+                return cached.get();
+            }
+        }
+
         List<RetrievedSnippet> snippets = retriever.retrieve(
                 question, snapshot.outcome(), unitId);
         if (snippets.isEmpty()) {
@@ -64,11 +88,21 @@ public class AnswerService {
 
         String userPrompt = buildPrompt(question, snippets, List.of());
         for (int attempt = 1; attempt <= maxAttempts(); attempt++) {
+            RateLimiter.Consumption consumption =
+                    rateLimiter.consume(clientKey, estimateTokens(userPrompt));
+            if (!consumption.allowed()) {
+                throw new RateLimitExceededException(consumption.usedToday(), consumption.dailyLimit());
+            }
             String raw = llmClient.complete(SYSTEM_PROMPT, userPrompt);
             ParsedAnswer parsed = parse(raw);
             ValidationResult validation = validate(parsed.references(), snippets);
             if (validation.invalid().isEmpty() || attempt == maxAttempts()) {
-                return new AnswerResponse(parsed.answer(), validation.valid(), properties.getModel());
+                AnswerResponse response = new AnswerResponse(
+                        parsed.answer(), validation.valid(), properties.getModel());
+                if (cacheKey != null) {
+                    cacheService.put(cacheKey, response);
+                }
+                return response;
             }
             userPrompt = buildPrompt(question, snippets, validation.invalid());
         }
@@ -77,6 +111,46 @@ public class AnswerService {
 
     private int maxAttempts() {
         return Math.max(1, properties.getMaxAttempts());
+    }
+
+    // ---------- T11：缓存 key 与 token 估算 ----------
+
+    /** commitSha 未知（null/空白）时返回 null —— 调用方据此完全跳过缓存。 */
+    private CacheKey cacheKeyFor(AnalysisTaskSnapshot snapshot, String question, String unitId) {
+        AnalysisTaskSnapshot.AnalysisOutcome outcome = snapshot.outcome();
+        String commitSha = outcome == null ? null : outcome.commitSha();
+        if (commitSha == null || commitSha.isBlank()) {
+            return null;
+        }
+        return new CacheKey(commitSha, resolveAnchorFile(outcome, unitId),
+                hashQuestion(question), properties.getModel());
+    }
+
+    private static String resolveAnchorFile(AnalysisTaskSnapshot.AnalysisOutcome outcome, String unitId) {
+        if (unitId == null || unitId.isBlank() || outcome == null || outcome.result() == null) {
+            return "";
+        }
+        return outcome.result().codeUnits().stream()
+                .filter(unit -> unit.id().equals(unitId))
+                .map(CodeUnitInfo::filePath)
+                .findFirst()
+                .orElse("");
+    }
+
+    static String hashQuestion(String question) {
+        String normalized = question == null ? "" : question.replaceAll("\\s+", " ").trim();
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(normalized.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, 8);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
+
+    /** 提示词级估算（字符数/4，中英同口径）。不解析 usage 字段 —— 那会迫使改 LlmClient 接口。 */
+    static long estimateTokens(String userPrompt) {
+        return Math.max(1, (SYSTEM_PROMPT.length() + userPrompt.length()) / 4);
     }
 
     // ---------- 提示词 ----------

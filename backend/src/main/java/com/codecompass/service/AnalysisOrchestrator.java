@@ -100,7 +100,7 @@ public class AnalysisOrchestrator {
                 DependencyGraph emptyGraph = graphBuilder.build(emptyResult, Map.of());
                 store.update(taskId, snapshot -> snapshot.withDone(
                         new AnalysisTaskSnapshot.AnalysisOutcome(
-                                emptyResult, emptyGraph, Map.of(), Map.of()),
+                                emptyResult, emptyGraph, Map.of(), Map.of(), cloneResult.commitSha()),
                         "", "未发现可解析的源码"));
                 return;
             }
@@ -130,7 +130,8 @@ public class AnalysisOrchestrator {
             Map<String, List<String>> sourceLines = snapshotSources(repoDir, files);
 
             store.update(taskId, snapshot -> snapshot.withDone(
-                    new AnalysisTaskSnapshot.AnalysisOutcome(result, graph, roles, sourceLines),
+                    new AnalysisTaskSnapshot.AnalysisOutcome(
+                            result, graph, roles, sourceLines, cloneResult.commitSha()),
                     language, "分析完成"));
         } catch (Exception e) {
             log.error("分析任务失败：{}（{}）", taskId, e.getMessage(), e);

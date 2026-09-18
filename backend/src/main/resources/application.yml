@@ -97,3 +97,11 @@ codecompass:
     model: gpt-4o-mini
     timeout: 60s
     max-attempts: 3
+
+  # T11：问答缓存与限流（纯内存，MVP 无 Redis）。缓存只存问答结果，不存仓库代码。
+  cache:
+    ttl: 1h
+    max-size: 500
+  rate-limit:
+    # 按匿名身份（X-Client-Id → X-Forwarded-For → IP）的自然日 token 上限
+    daily-token-limit: 100000

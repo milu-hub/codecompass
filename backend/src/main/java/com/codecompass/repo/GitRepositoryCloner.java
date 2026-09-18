@@ -14,6 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * T1：把 GitHub 公开仓库拉取到临时工作区。
  *
@@ -24,6 +27,8 @@ import java.util.stream.Stream;
  * 用户等不起。
  */
 public class GitRepositoryCloner {
+
+    private static final Logger log = LoggerFactory.getLogger(GitRepositoryCloner.class);
 
     private static final String GITHUB_PREFIX = "https://github.com/";
     private static final String REPO_DIR_NAME = "repo";
@@ -126,7 +131,38 @@ public class GitRepositoryCloner {
             if (limitError.isPresent()) {
                 return cleanupAndFail(jobDir, limitError.get());
             }
-            return CloneResult.ok(repoDir.toString());
+            return CloneResult.ok(repoDir.toString(), readHeadSha(jobDir, repoDir, logFile, deadline));
+        }
+    }
+
+    /**
+     * T11 缓存 key 的身份锚：检出后取 HEAD 的 commit SHA。
+     *
+     * <p>输出与 clone.log 分文件，避免从混合输出里抠行号。任何失败（超时 / 非零退出 /
+     * 文件缺失）都只降级为 null —— 下游据此跳过缓存，**克隆本身不因 sha 失败而失败**
+     * （宁可 miss 不可错命中，也不能让缓存能力反噬主流程）。
+     */
+    private String readHeadSha(Path jobDir, Path repoDir, Path logFile, long deadline) {
+        Path shaFile = jobDir.resolve("head-sha.txt");
+        Duration remaining = Duration.ofNanos(deadline - System.nanoTime());
+        if (remaining.isZero() || remaining.isNegative()) {
+            log.warn("克隆预算耗尽，跳过 commit SHA 采集（缓存将不参与本次分析）");
+            return null;
+        }
+        try {
+            GitProcessRunner.Outcome outcome = runner.run(
+                    gitInRepo(repoDir, "rev-parse", "HEAD"),
+                    gitEnvironment(), repoDir, shaFile, remaining);
+            if (outcome.timedOut() || outcome.exitCode() != 0) {
+                log.warn("commit SHA 采集失败（exit={}，timedOut={}），缓存将不参与本次分析",
+                        outcome.exitCode(), outcome.timedOut());
+                return null;
+            }
+            String sha = Files.readString(shaFile).trim();
+            return sha.isBlank() ? null : sha;
+        } catch (IOException e) {
+            log.warn("读取 commit SHA 失败（{}），缓存将不参与本次分析", e.getMessage());
+            return null;
         }
     }
 

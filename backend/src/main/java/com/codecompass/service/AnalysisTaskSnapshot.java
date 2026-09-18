@@ -55,12 +55,21 @@ public record AnalysisTaskSnapshot(
      *
      * <p>{@code sourceLines} 是 T7 决策 ② 的落地：分析完立即删工作区（§07 底线），
      * 删除前把源文件内容快照进内存，供 T9 检索与 T10 引用使用。
+     *
+     * <p>{@code commitSha} 是 T11 缓存 key 的仓库版本锚；null 表示未知（老数据或夹具），
+     * 下游必须降级为不缓存。4 参便捷构造器只服务既有调用点，新代码一律带 sha。
      */
     public record AnalysisOutcome(
             AnalyzeResult result,
             DependencyGraph graph,
             Map<String, String> roles,
-            Map<String, List<String>> sourceLines) {
+            Map<String, List<String>> sourceLines,
+            String commitSha) {
+
+        public AnalysisOutcome(AnalyzeResult result, DependencyGraph graph,
+                               Map<String, String> roles, Map<String, List<String>> sourceLines) {
+            this(result, graph, roles, sourceLines, null);
+        }
 
         public AnalysisOutcome {
             roles = roles == null ? Map.of() : Map.copyOf(roles);

@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T11 内存缓存 + 限流
+T12 端到端验收 + Python stub
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 208 + 集成 16 = 224，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 226 + 集成 16 = 242，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -18,6 +18,7 @@ T11 内存缓存 + 限流
 - T8 Vue 类列表 + Mermaid 图：`RepositoryView` / `ClassList` / `DependencyGraphPane` / `stores/repository` / `api/repos`，mermaid 12 动态 import。后端 `/graph` 加 `?unit=&depth=` 邻域参数（控制器加量）。新增后端单元 2
 - T9 代码片段检索层：`CodeRetriever` / `LexicalCodeRetriever` / `RetrievedSnippet` / `RetrieveProperties` / `RetrieveConfiguration`。词法检索（类/方法/字段/注解/包名 token 命中）+ 锚点层（锚点 +10、一跳出边 +3）。纯内存，从 T7 快照取数，无重克隆。新增单元 11
 - T10 LLM 问答接口：`POST /api/repos/{id}/ask`。`LlmClient` 接口 + `OpenAiCompatibleLlmClient`（OpenAI 兼容协议，本地 HttpServer 实测请求体/Bearer/choice 提取）+ `AnswerService`（提示词每行前缀真实行号、宽松解析、引用逐条严格包含校验、不匹配丢弃带反馈重试、预算封顶）。新增单元 20
+- T11 内存缓存 + 限流：`CacheService`/`InMemoryCacheService`（TTL + LRU 容量上限）、`RateLimiter`/`InMemoryRateLimiter`（按身份的自然日 token 上限）、`CacheKey`（sha+文件+问题hash+模型四要素）。commit SHA 全链路补齐（克隆后 `rev-parse HEAD` → CloneResult → outcome）。新增单元 18（集成测试补 1 条真机 sha 断言）
 
 ## 本地运行（已实测通过）
 ```bash
@@ -148,3 +149,12 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：引用校验口径 = **单片段严格包含**（file 字节相等 + language 相同 + 行区间完全落在某片段的 1-based 区间内）；解析按条容忍（行号写成字符串也收），坏条目只丢自身；重试反馈把被丢弃清单原样列给 LLM
 - 2026-09-18：`AnswerResponse` 放 `service/` 包而非 `web/dto/` —— service 层返回自己的结果类型，不反向依赖 web 层（方向性）；`AskRequest` 是入参 DTO，留 web/dto
 - 2026-09-18：**T10 运行态实测**（真实 jar + 真实克隆 petclinic）：404/400/409 各归其位；done 后无 api-key → **502「LLM 未配置」**且发生在任何网络调用之前；配置真实 key 后无需改码即可用（`CODESCOMPASS_LLM_API_KEY` 环境变量或 yml）
+- 2026-09-18：**commit SHA 是缓存 key 的仓库版本锚**：克隆命令序列后追加第 5 条 `git rev-parse HEAD`（输出独立文件 head-sha.txt，不从混合日志抠行）；任何失败只降级为 null（**克隆不因 sha 失败而失败**），下游据此整体跳过缓存 —— 宁可 miss 不可错命中
+- 2026-09-18：`CloneResult`/`AnalysisOutcome` 加 `commitSha` 组件时保留 1-arg/4-arg 便捷构造器 —— 既有调用点与测试夹具零改动（与「不重构」边界的和解方式：加量 + 兼容入口）
+- 2026-09-18：**ask 管道顺序即正确性**：缓存命中 → 返回（零 LLM 消耗、零计费）→ 检索 → 空则 fallback（不缓存不计费）→ 每轮 LLM 前计费（超限 429）→ LLM。顺序颠倒任一项都会错杀省钱路径或漏杀超限
+- 2026-09-18：限流窗口 = `clientKey|LocalDate` 自然日，午夜自动翻转 + consume 时惰性清旧日期；**先 addAndGet 后判定**（并发微超不回滚、如实累计）；上限实时读配置（验收用 `--codecompass.rate-limit.daily-token-limit=1` 覆盖即可，无需改包）
+- 2026-09-18：**token 计费 = 提示词字符数/4 的估算**（中英同口径），不解析 usage 字段 —— 那会迫使改 LlmClient 接口（T10 已完成，不值得为精度动它）。实测单问约 4000 估算 token，日限 10 万 ≈ 24 问，MVP 够用
+- 2026-09-18：**clientKey 解析 X-Client-Id → X-Forwarded-For 首跳 → remoteAddr** —— 只读 remoteAddr 的话 dev 经 Vite 代理全站共享一个额度（易错点 3 的落地）；三条路径都有控制器测试钉住
+- 2026-09-18：缓存实现 = `synchronizedMap(LinkedHashMap access-order)` + `removeEldestEntry` 容量 + 条目时间戳 TTL（get/put 惰性剔除过期）；`CacheService`/`RateLimiter` 均按接口注入，业务层零内存实现类引用；`Clock` 以 Bean 注入供假钟测试（与 Boot 4.1 无冲突，本轮 @SpringBootTest 全绿）
+- 2026-09-18：**运行态实测**：日限额 1 时真实克隆 done 后 ask → **429「已达今日 LLM token 上限（4079/1）」**，限流先于 LLM、计数跨请求持久；集成测试新增断言钉住真机克隆的 `outcome.commitSha` 非空
+- 2026-09-18：**踩坑 —— 集成套件与运行 jar 共用 `java.io.tmpdir/codecompass` 会互踩**（一方删除另一方的工作区 → 「准备工作区失败：删除工作区失败」）。运行态验收与集成测试**不能并行**，此后都串行执行

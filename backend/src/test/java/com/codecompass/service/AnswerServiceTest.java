@@ -1,5 +1,6 @@
 package com.codecompass.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +18,7 @@ import com.codecompass.analyzer.MethodInfo;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.retrieve.LexicalCodeRetriever;
 import com.codecompass.retrieve.RetrieveProperties;
+import com.codecompass.testutil.MutableClock;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -29,10 +31,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * T10 问答编排。
+ * T10 问答编排 + T11 缓存与限流接入。
  *
  * 核心契约：行号只能来自检索层 —— LLM 报出的引用逐条与检索片段比对，
  * 不匹配的丢弃并带反馈重试（预算封顶）；输出完全不可解析时降级为纯文本答案。
+ * 缓存命中短路 LLM（零计费）、sha 缺失不缓存、超限抛异常。
  * LLM 用 mock（传输层由 {@code OpenAiCompatibleLlmClientTest} 用本地 HTTP 服务实测）。
  */
 class AnswerServiceTest {
@@ -41,15 +44,23 @@ class AnswerServiceTest {
 
     private LlmClient llmClient;
     private AnswerService service;
+    private InMemoryCacheService cacheService;
+    private InMemoryRateLimiter rateLimiter;
 
     @BeforeEach
     void setUp() {
         llmClient = Mockito.mock(LlmClient.class);
+        cacheService = new InMemoryCacheService(new MutableClock(Instant.parse("2026-09-18T00:00:00Z")),
+                new CacheProperties());
+        rateLimiter = new InMemoryRateLimiter(new MutableClock(Instant.parse("2026-09-18T00:00:00Z")),
+                new RateLimitProperties());
         service = new AnswerService(
                 new LexicalCodeRetriever(new RetrieveProperties()),
                 llmClient,
                 new LlmProperties(),
-                JsonMapper.builder().build());
+                JsonMapper.builder().build(),
+                cacheService,
+                rateLimiter);
     }
 
     @Test
@@ -59,7 +70,7 @@ class AnswerServiceTest {
                 "{\"answer\":\"OwnerController 负责表单提交\",\"references\":[{\"file\":\""
                         + OWNER_FILE + "\",\"language\":\"java\",\"startLine\":1,\"endLine\":9}]}");
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController 是干什么的", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController 是干什么的", null, "test-client");
 
         assertThat(response.answer()).isEqualTo("OwnerController 负责表单提交");
         assertThat(response.references())
@@ -78,7 +89,7 @@ class AnswerServiceTest {
                 .thenReturn("{\"answer\":\"A\",\"references\":["
                         + "{\"file\":\"" + OWNER_FILE + "\",\"language\":\"java\",\"startLine\":5,\"endLine\":8}]}");
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null, "test-client");
 
         assertThat(response.references())
                 .containsExactly(new AnswerResponse.Reference(OWNER_FILE, "java", 5, 8));
@@ -99,7 +110,7 @@ class AnswerServiceTest {
                 + "{\"file\":\"src/main/java/Ghost.java\",\"language\":\"java\",\"startLine\":1,\"endLine\":2}]}";
         Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(alwaysPartiallyBad);
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null, "test-client");
 
         assertThat(response.references())
                 .containsExactly(new AnswerResponse.Reference(OWNER_FILE, "java", 1, 9));
@@ -109,7 +120,7 @@ class AnswerServiceTest {
     @Test
     @DisplayName("检索零命中且无锚点：直接返回提示语，不调用 LLM")
     void emptyRetrievalReturnsFallbackWithoutCallingLlm() {
-        AnswerResponse response = service.ask(doneSnapshot(), "zzzz 完全不存在的词", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "zzzz 完全不存在的词", null, "test-client");
 
         assertThat(response.answer()).contains("未检索到");
         assertThat(response.references()).isEmpty();
@@ -122,7 +133,7 @@ class AnswerServiceTest {
         Mockito.when(llmClient.complete(anyString(), anyString()))
                 .thenReturn("抱歉，我无法用 JSON 回答这个问题。");
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null, "test-client");
 
         assertThat(response.answer()).isEqualTo("抱歉，我无法用 JSON 回答这个问题。");
         assertThat(response.references()).isEmpty();
@@ -135,7 +146,7 @@ class AnswerServiceTest {
                 "```json\n{\"answer\":\"A\",\"references\":[{\"file\":\"" + OWNER_FILE
                         + "\",\"language\":\"java\",\"startLine\":1,\"endLine\":9}]}\n```");
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null, "test-client");
 
         assertThat(response.answer()).isEqualTo("A");
         assertThat(response.references())
@@ -147,7 +158,7 @@ class AnswerServiceTest {
     void jsonWithoutAnswerFieldFallsBackToRawText() {
         Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn("{\"references\":[]}");
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null, "test-client");
 
         assertThat(response.answer()).isEqualTo("{\"references\":[]}");
         assertThat(response.references()).isEmpty();
@@ -159,7 +170,7 @@ class AnswerServiceTest {
         Mockito.when(llmClient.complete(anyString(), anyString()))
                 .thenThrow(new LlmException("LLM 调用失败：HTTP 500"));
 
-        assertThatThrownBy(() -> service.ask(doneSnapshot(), "OwnerController", null))
+        assertThatThrownBy(() -> service.ask(doneSnapshot(), "OwnerController", null, "test-client"))
                 .isInstanceOf(LlmException.class)
                 .hasMessageContaining("LLM 调用失败");
         verify(llmClient, times(1)).complete(anyString(), anyString());
@@ -172,7 +183,7 @@ class AnswerServiceTest {
                 .thenReturn("{\"answer\":\"A\",\"references\":[]}");
         ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
 
-        service.ask(doneSnapshot(), "这个类是干什么的", "u-oc");
+        service.ask(doneSnapshot(), "这个类是干什么的", "u-oc", "test-client");
 
         verify(llmClient).complete(anyString(), prompt.capture());
         assertThat(prompt.getValue())
@@ -189,10 +200,73 @@ class AnswerServiceTest {
                 "{\"answer\":\"A\",\"references\":[{\"file\":\"" + OWNER_FILE
                         + "\",\"language\":\"java\",\"startLine\":\"1\",\"endLine\":\"9\"}]}");
 
-        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null);
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController", null, "test-client");
 
         assertThat(response.references())
                 .containsExactly(new AnswerResponse.Reference(OWNER_FILE, "java", 1, 9));
+    }
+
+    // ---------- T11 缓存与限流 ----------
+
+    @Test
+    @DisplayName("缓存命中短路 LLM：同一 key 第二次 ask 不再调用，且零计费")
+    void cachedAnswerShortCircuitsLlm() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"缓存里的回答\",\"references\":[{\"file\":\"" + OWNER_FILE
+                        + "\",\"language\":\"java\",\"startLine\":1,\"endLine\":9}]}");
+
+        AnswerResponse first = service.ask(doneSnapshotWithSha("abc123"), "OwnerController", null, "test-client");
+        long usedAfterFirst = rateLimiter.consume("test-client", 0).usedToday();
+        assertThat(usedAfterFirst).as("缓存未命中的首次 ask 必须真实计费").isPositive();
+        AnswerResponse second = service.ask(doneSnapshotWithSha("abc123"), "OwnerController", null, "test-client");
+
+        assertThat(second).isEqualTo(first);
+        verify(llmClient, times(1)).complete(anyString(), anyString());
+        assertThat(rateLimiter.consume("test-client", 0).usedToday())
+                .as("缓存命中不得再消耗额度")
+                .isEqualTo(usedAfterFirst);
+    }
+
+    @Test
+    @DisplayName("commitSha 缺失：不查不写缓存（宁可 miss 不可错命中）")
+    void missingCommitShaSkipsCache() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"A\",\"references\":[{\"file\":\"" + OWNER_FILE
+                        + "\",\"language\":\"java\",\"startLine\":1,\"endLine\":9}]}");
+
+        service.ask(doneSnapshot(), "OwnerController", null, "test-client");
+        service.ask(doneSnapshot(), "OwnerController", null, "test-client");
+
+        verify(llmClient, times(2)).complete(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("超限：抛 RateLimitExceededException 且不触达 LLM")
+    void rateLimitExceededThrowsBeforeLlm() {
+        RateLimitProperties tiny = new RateLimitProperties();
+        tiny.setDailyTokenLimit(1);
+        AnswerService tinyBudget = new AnswerService(
+                new LexicalCodeRetriever(new RetrieveProperties()),
+                llmClient, new LlmProperties(), JsonMapper.builder().build(),
+                cacheService, new InMemoryRateLimiter(new MutableClock(Instant.parse("2026-09-18T00:00:00Z")), tiny));
+
+        assertThatThrownBy(() -> tinyBudget.ask(doneSnapshot(), "OwnerController", null, "test-client"))
+                .isInstanceOf(RateLimitExceededException.class)
+                .hasMessageContaining("token 上限");
+        verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    @DisplayName("成功的 ask 消耗了该客户端的当日额度")
+    void successfulAskChargesTokens() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"A\",\"references\":[]}");
+
+        service.ask(doneSnapshot(), "OwnerController", null, "test-client");
+
+        assertThat(rateLimiter.consume("test-client", 0).usedToday())
+                .as("提示词 token 估算必须已计入该客户端当日用量")
+                .isPositive();
     }
 
     // ---------- 夹具 ----------
@@ -207,6 +281,10 @@ class AnswerServiceTest {
 
     /** done 任务：OwnerController（1..40）+ processFindForm 方法（10..20），快照含源码。 */
     private static AnalysisTaskSnapshot doneSnapshot() {
+        return doneSnapshotWithSha(null);
+    }
+
+    private static AnalysisTaskSnapshot doneSnapshotWithSha(String commitSha) {
         CodeUnitInfo ownerController = new CodeUnitInfo(
                 "u-oc", "repo-1", OWNER_FILE, "java", "spring",
                 "com.example", "OwnerController", "class",
@@ -222,8 +300,8 @@ class AnswerServiceTest {
         Map<String, List<String>> sourceLines = new LinkedHashMap<>();
         sourceLines.put(OWNER_FILE, numberedLines(40));
 
-        AnalysisTaskSnapshot.AnalysisOutcome outcome =
-                new AnalysisTaskSnapshot.AnalysisOutcome(result, graph, Map.of(), sourceLines);
+        AnalysisTaskSnapshot.AnalysisOutcome outcome = new AnalysisTaskSnapshot.AnalysisOutcome(
+                result, graph, Map.of(), sourceLines, commitSha);
 
         AnalysisTaskStore store = new AnalysisTaskStore();
         String taskId = store.create("https://github.com/a/b");

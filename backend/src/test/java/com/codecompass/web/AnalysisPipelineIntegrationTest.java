@@ -101,6 +101,10 @@ class AnalysisPipelineIntegrationTest {
                         assertThat(lines).anyMatch(line -> line.contains("class OwnerController"));
                     }
                 });
+        // T11：缓存 key 的仓库版本锚必须穿透真机克隆（rev-parse → CloneResult → outcome）
+        assertThat(snapshot.outcome().commitSha())
+                .as("真机克隆后必须取到 HEAD commit SHA，否则缓存层会整体静默失效")
+                .isNotBlank();
         assertThat(isTempRootEmpty()).as("分析完成后临时目录必须为空").isTrue();
     }
 
