@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { fetchGraph, fetchStatus, submitRepository } from '../api/repos'
-import type { AnalysisTaskView, GraphResponse } from '../api/repos'
+import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath } from '../api/repos'
+import type { AnalysisTaskView, GraphResponse, LearningPath } from '../api/repos'
 
 export type TaskPhase = 'idle' | 'submitting' | 'pending' | 'running' | 'done' | 'failed'
 
@@ -34,6 +34,7 @@ export const useRepositoryStore = defineStore('repository', {
     selectedUnitId: null as string | null,
     filterText: '',
     selection: null as SourceSelection | null,
+    learningPath: null as LearningPath | null,
     pollingHandle: null as number | null,
     // 点击类的请求竞态令牌：晚到的旧响应必须丢弃
     unitRequestToken: 0,
@@ -54,6 +55,7 @@ export const useRepositoryStore = defineStore('repository', {
       this.graph = null
       this.neighborhood = null
       this.selectedUnitId = null
+      this.learningPath = null
       this.progress = 0
       this.message = ''
       try {
@@ -114,6 +116,7 @@ export const useRepositoryStore = defineStore('repository', {
       if (first && !this.selectedUnitId) {
         await this.selectUnit(first.id)
       }
+      void this.loadLearningPath()
     },
 
     async selectUnit(unitId: string) {
@@ -135,6 +138,24 @@ export const useRepositoryStore = defineStore('repository', {
 
     clearSelection() {
       this.selection = null
+    },
+
+    async loadLearningPath() {
+      if (!this.taskId) {
+        return
+      }
+      try {
+        this.learningPath = await fetchLearningPath(this.taskId)
+      } catch {
+        this.learningPath = null   // 尚未生成
+      }
+    },
+
+    async generateLearningPath() {
+      if (!this.taskId) {
+        return
+      }
+      this.learningPath = await generateLearningPath(this.taskId)
     },
   },
 })

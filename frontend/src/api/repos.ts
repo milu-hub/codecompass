@@ -128,3 +128,28 @@ export function askQuestion(
     anchorEndLine: anchorEndLine ?? null,
   })
 }
+
+// ---------- F2 学习路线（T14/T15） ----------
+
+export interface LearningPathStep {
+  order: number
+  codeUnitId: string
+  reason: string
+  estimatedMinutes: number
+}
+
+export interface LearningPath {
+  repoUrl: string
+  commitSha: string
+  steps: LearningPathStep[]
+}
+
+/** POST 生成（后端幂等：已生成直接返回持久化结果）。 */
+export function generateLearningPath(taskId: string): Promise<LearningPath> {
+  return postJson<LearningPath>(`/api/repos/${taskId}/learning-path`, {})
+}
+
+/** GET 获取；未生成时后端返回 404。 */
+export function fetchLearningPath(taskId: string): Promise<LearningPath> {
+  return getJson<LearningPath>(`/api/repos/${taskId}/learning-path`)
+}

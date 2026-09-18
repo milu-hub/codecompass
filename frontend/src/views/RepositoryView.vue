@@ -6,6 +6,7 @@ import ClassList from '../components/ClassList.vue'
 import DependencyGraphPane from '../components/DependencyGraphPane.vue'
 import QaPanel from '../components/QaPanel.vue'
 import SourcePane from '../components/SourcePane.vue'
+import LearningPathPanel from '../components/LearningPathPanel.vue'
 
 const repository = useRepositoryStore()
 const {
@@ -23,6 +24,7 @@ const {
 } = storeToRefs(repository)
 
 const showFullGraph = ref(false)
+const listTab = ref<'classes' | 'path'>('classes')
 
 const displayedMermaid = computed(() => {
   if (showFullGraph.value && graph.value) {
@@ -91,13 +93,20 @@ async function onSubmit() {
     <!-- 结果区 -->
     <div v-if="phase === 'done' && graph" class="result-layout">
       <div class="list-pane">
-        <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
-        <ClassList
-          :units="graph.codeUnits"
-          :selected-id="selectedUnitId"
-          :filter-text="filterText"
-          @select="(id: string) => void repository.selectUnit(id)"
-        />
+        <el-tabs v-model="listTab" class="list-tabs">
+          <el-tab-pane label="类列表" name="classes">
+            <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
+            <ClassList
+              :units="graph.codeUnits"
+              :selected-id="selectedUnitId"
+              :filter-text="filterText"
+              @select="(id: string) => void repository.selectUnit(id)"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="学习路线" name="path">
+            <LearningPathPanel />
+          </el-tab-pane>
+        </el-tabs>
       </div>
 
       <div class="source-pane">
