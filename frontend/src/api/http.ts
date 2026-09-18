@@ -34,3 +34,25 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   }
   return (await response.json()) as T
 }
+
+export async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(`PUT ${path} 失败：HTTP ${response.status}`)
+  }
+  return (await response.json()) as T
+}
+
+export async function delJson(path: string): Promise<void> {
+  const response = await fetch(path, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok && response.status !== 204) {
+    throw new Error(`DELETE ${path} 失败：HTTP ${response.status}`)
+  }
+}

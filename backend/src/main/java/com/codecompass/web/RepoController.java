@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +50,8 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping("/api/repos")
 public class RepoController {
 
+    private static final Logger log = LoggerFactory.getLogger(RepoController.class);
+
     private final GitRepositoryCloner cloner;
     private final AnalysisOrchestrator orchestrator;
     private final AnalysisTaskStore store;
@@ -87,11 +91,15 @@ public class RepoController {
         return store.find(taskId)
                 .<ResponseEntity<?>>map(snapshot -> {
                     // T19 触发点：客户端首次观察到 done = 「分析成功后」（异步管线不带身份，
-                    // 由轮询方身份记录；refId=taskId 幂等）
+                    // 由轮询方身份记录；refId=taskId 幂等）。记录失败不打断状态查询。
                     if (AnalysisTaskSnapshot.STATUS_DONE.equals(snapshot.status())) {
                         String clientId = ClientIdentityHolder.get();
                         if (clientId != null) {
-                            achievementService.record(clientId, "analyze", snapshot.url(), taskId);
+                            try {
+                                achievementService.record(clientId, "analyze", snapshot.url(), taskId);
+                            } catch (RuntimeException e) {
+                                log.warn("成就记录失败（analyze）：{}", e.getMessage());
+                            }
                         }
                     }
                     return ResponseEntity.ok(AnalysisTaskView.from(snapshot));
@@ -196,10 +204,14 @@ public class RepoController {
             } else {
                 response = ResponseEntity.ok(answerService.ask(snapshot, question, unitId, clientKey));
             }
-            // T19 触发点：提问成功后计数（TEN_QUESTIONS）
+            // T19 触发点：提问成功后计数（TEN_QUESTIONS）。记录失败不打断问答。
             String clientId = ClientIdentityHolder.get();
             if (clientId != null) {
-                achievementService.record(clientId, "ask", snapshot.url(), null);
+                try {
+                    achievementService.record(clientId, "ask", snapshot.url(), null);
+                } catch (RuntimeException e) {
+                    log.warn("成就记录失败（ask）：{}", e.getMessage());
+                }
             }
             return response;
         } catch (RateLimitExceededException e) {

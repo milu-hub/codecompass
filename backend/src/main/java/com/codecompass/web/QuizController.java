@@ -3,6 +3,8 @@ package com.codecompass.web;
 import java.time.Instant;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @RestController
 public class QuizController {
+
+    private static final Logger log = LoggerFactory.getLogger(QuizController.class);
 
     private final AnalysisTaskStore store;
     private final QuizService service;
@@ -88,10 +92,14 @@ public class QuizController {
                         .map(answer -> new QuizService.AnswerSubmission(answer.questionId(), answer.answerIndex()))
                         .toList();
         QuizService.GradeResult grade = service.grade(quiz, answers);
-        // T19 触发点：QUIZ_MASTER（100% 正确率；refId=quizId 幂等）
+        // T19 触发点：QUIZ_MASTER（100% 正确率；refId=quizId 幂等）。记录失败不打断判分。
         String clientId = ClientIdentityHolder.get();
         if (clientId != null && grade.total() > 0 && grade.accuracy() == 1.0) {
-            achievementService.record(clientId, "quiz_perfect", entity.getRepoUrl(), quizId);
+            try {
+                achievementService.record(clientId, "quiz_perfect", entity.getRepoUrl(), quizId);
+            } catch (RuntimeException e) {
+                log.warn("成就记录失败（quiz_perfect）：{}", e.getMessage());
+            }
         }
         return ResponseEntity.ok(new QuizGradeView(grade.correct(), grade.total(), grade.accuracy()));
     }

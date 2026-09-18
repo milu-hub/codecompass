@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,6 +28,8 @@ import com.codecompass.web.dto.NoteRequest;
 /** F5 笔记 CRUD：绑定到 (clientId, repoUrl, codeUnitId)，所有权校验。 */
 @RestController
 public class NoteController {
+
+    private static final Logger log = LoggerFactory.getLogger(NoteController.class);
 
     private final NoteRepository repository;
     private final AchievementService achievementService;
@@ -70,8 +74,13 @@ public class NoteController {
                 .orElseGet(() -> new NoteEntity(clientId, request.repoUrl(), request.codeUnitId(),
                         request.content(), now, now));
         repository.save(note);
-        // T19 触发点：FIRST_NOTE（refId=codeUnitId，同单元反复编辑不重复计数）
-        achievementService.record(clientId, "note", request.repoUrl(), request.codeUnitId());
+        // T19 触发点：FIRST_NOTE（refId=codeUnitId，同单元反复编辑不重复计数）。
+        // 成就记录失败不打断笔记主流程。
+        try {
+            achievementService.record(clientId, "note", request.repoUrl(), request.codeUnitId());
+        } catch (RuntimeException e) {
+            log.warn("成就记录失败（note）：{}", e.getMessage());
+        }
         return ResponseEntity.ok(toNote(note));
     }
 

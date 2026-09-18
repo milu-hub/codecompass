@@ -6,6 +6,8 @@ const props = defineProps<{
   units: UnitView[]
   selectedId: string | null
   filterText: string
+  /** F5：codeUnitId → status（unread/reading/done）的进度标记 */
+  progress?: Record<string, string>
 }>()
 
 const emit = defineEmits<{ select: [id: string] }>()
@@ -18,6 +20,17 @@ const roleTagType: Record<string, TagType> = {
   service: 'success',
   repository: 'danger',
   component: 'info',
+}
+
+/** F5：进度标记颜色。 */
+function progressDot(status: string | undefined): string {
+  if (status === 'done') {
+    return '#67c23a'
+  }
+  if (status === 'reading') {
+    return '#e6a23c'
+  }
+  return '#dcdfe6'
 }
 
 const filtered = computed(() => {
@@ -42,6 +55,11 @@ const filtered = computed(() => {
       :class="{ selected: unit.id === selectedId }"
       @click="emit('select', unit.id)"
     >
+      <span
+        class="progress-dot"
+        :style="{ background: progressDot(progress?.[unit.id]) }"
+        :title="progress?.[unit.id] ? `进度：${progress[unit.id]}` : '未读'"
+      ></span>
       <span class="class-name">{{ unit.name }}</span>
       <el-tag v-if="unit.role" :type="roleTagType[unit.role] ?? 'info'" size="small" effect="plain">
         {{ unit.role }}
@@ -78,6 +96,14 @@ const filtered = computed(() => {
 
 .class-name {
   font-weight: 600;
+}
+
+.progress-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dcdfe6;
 }
 
 .class-package {

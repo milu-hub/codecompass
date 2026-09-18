@@ -1,4 +1,4 @@
-import { getJson, postJson } from './http'
+import { getJson, postJson, putJson, delJson } from './http'
 
 /**
  * T7 REST API 的 TS 类型，手写镜像后端契约（不引 openapi 生成 —— T0 定下的原则）。
@@ -196,4 +196,59 @@ export function submitQuiz(
   answers: { questionId: string; answerIndex: number }[],
 ): Promise<QuizGrade> {
   return postJson<QuizGrade>(`/api/quizzes/${quizId}/submit`, { answers })
+}
+
+// ---------- F5 进度 / 笔记 / 成就（T19/T20） ----------
+
+export interface ProgressView {
+  clientId: string
+  repoUrl: string
+  codeUnitId: string
+  status: string
+  updatedAt: string
+}
+
+export function fetchProgress(repoUrl: string): Promise<ProgressView[]> {
+  return getJson<ProgressView[]>(`/api/progress?repoUrl=${encodeURIComponent(repoUrl)}`)
+}
+
+export function updateProgress(repoUrl: string, codeUnitId: string, status: string): Promise<ProgressView> {
+  return putJson<ProgressView>('/api/progress', { repoUrl, codeUnitId, status })
+}
+
+export interface NoteView {
+  id: number
+  clientId: string
+  repoUrl: string
+  codeUnitId: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export function fetchNotes(repoUrl: string): Promise<NoteView[]> {
+  return getJson<NoteView[]>(`/api/notes?repoUrl=${encodeURIComponent(repoUrl)}`)
+}
+
+export function saveNote(repoUrl: string, codeUnitId: string, content: string): Promise<NoteView> {
+  return postJson<NoteView>('/api/notes', { repoUrl, codeUnitId, content })
+}
+
+export function updateNote(noteId: number, content: string): Promise<NoteView> {
+  return putJson<NoteView>(`/api/notes/${noteId}`, { content })
+}
+
+export function deleteNote(noteId: number): Promise<void> {
+  return delJson(`/api/notes/${noteId}`)
+}
+
+export interface AchievementView {
+  code: string
+  name: string
+  description: string
+  unlockedAt: string | null
+}
+
+export function fetchAchievements(): Promise<AchievementView[]> {
+  return getJson<AchievementView[]>('/api/achievements')
 }

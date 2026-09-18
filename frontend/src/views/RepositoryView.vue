@@ -8,6 +8,7 @@ import QaPanel from '../components/QaPanel.vue'
 import SourcePane from '../components/SourcePane.vue'
 import LearningPathPanel from '../components/LearningPathPanel.vue'
 import QuizPanel from '../components/QuizPanel.vue'
+import NotePanel from '../components/NotePanel.vue'
 
 const repository = useRepositoryStore()
 const {
@@ -101,6 +102,7 @@ async function onSubmit() {
               :units="graph.codeUnits"
               :selected-id="selectedUnitId"
               :filter-text="filterText"
+              :progress="repository.unitProgress"
               @select="(id: string) => void repository.selectUnit(id)"
             />
           </el-tab-pane>
@@ -133,6 +135,8 @@ async function onSubmit() {
         <p v-if="graph.isolatedCodeUnitIds.length > 0" class="isolated-hint">
           另有 {{ graph.isolatedCodeUnitIds.length }} 个类没有依赖关系，未画进图
         </p>
+        <!-- F5：右侧笔记面板（当前选中类） -->
+        <NotePanel />
       </div>
     </div>
   </el-card>

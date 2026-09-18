@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath, generateQuiz, submitQuiz } from '../api/repos'
-import type { AnalysisTaskView, GraphResponse, LearningPath, Quiz, QuizGrade } from '../api/repos'
+import { fetchGraph, fetchStatus, submitRepository, fetchLearningPath, generateLearningPath, generateQuiz, submitQuiz, fetchProgress, updateProgress, fetchNotes, saveNote, updateNote, deleteNote, fetchAchievements } from '../api/repos'
+import type { AnalysisTaskView, GraphResponse, LearningPath, Quiz, QuizGrade, NoteView, AchievementView } from '../api/repos'
 
 export type TaskPhase = 'idle' | 'submitting' | 'pending' | 'running' | 'done' | 'failed'
 
@@ -37,6 +37,9 @@ export const useRepositoryStore = defineStore('repository', {
     learningPath: null as LearningPath | null,
     quiz: null as Quiz | null,
     quizGrade: null as QuizGrade | null,
+    unitProgress: {} as Record<string, string>,
+    notes: [] as NoteView[],
+    achievements: [] as AchievementView[],
     pollingHandle: null as number | null,
     // 点击类的请求竞态令牌：晚到的旧响应必须丢弃
     unitRequestToken: 0,
@@ -121,6 +124,8 @@ export const useRepositoryStore = defineStore('repository', {
         await this.selectUnit(first.id)
       }
       void this.loadLearningPath()
+      void this.loadProgress(this.graph.repositoryUrl)
+      void this.loadNotes(this.graph.repositoryUrl)
     },
 
     async selectUnit(unitId: string) {
@@ -175,6 +180,42 @@ export const useRepositoryStore = defineStore('repository', {
         return
       }
       this.quizGrade = await submitQuiz(this.quiz.id, answers)
+    },
+
+    async loadProgress(repoUrl: string) {
+      this.unitProgress = {}
+      for (const item of await fetchProgress(repoUrl)) {
+        this.unitProgress[item.codeUnitId] = item.status
+      }
+    },
+
+    async setProgress(repoUrl: string, codeUnitId: string, status: string) {
+      await updateProgress(repoUrl, codeUnitId, status)
+      this.unitProgress[codeUnitId] = status
+    },
+
+    async loadNotes(repoUrl: string) {
+      this.notes = await fetchNotes(repoUrl)
+    },
+
+    async saveNote(repoUrl: string, codeUnitId: string, content: string) {
+      await saveNote(repoUrl, codeUnitId, content)
+      await this.loadNotes(repoUrl)
+    },
+
+    async removeNote(noteId: number, repoUrl: string) {
+      await deleteNote(noteId)
+      await this.loadNotes(repoUrl)
+    },
+
+    /** 刷新成就，返回本次新解锁的成就（供组件弹提示）。 */
+    async refreshAchievements(): Promise<AchievementView[]> {
+      const next = await fetchAchievements()
+      const previouslyUnlocked = new Set(
+        this.achievements.filter((a) => a.unlockedAt).map((a) => a.code),
+      )
+      this.achievements = next
+      return next.filter((a) => a.unlockedAt && !previouslyUnlocked.has(a.code))
     },
   },
 })
