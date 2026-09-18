@@ -4,7 +4,7 @@
 无 —— MVP 按 T0～T12 全部交付，验收见 `docs/T12-验收报告.md`
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 229 + 集成 21 = 250，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 236 + 集成 21 = 257，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -21,6 +21,7 @@
 - T11 内存缓存 + 限流：`CacheService`/`InMemoryCacheService`（TTL + LRU 容量上限）、`RateLimiter`/`InMemoryRateLimiter`（按身份的自然日 token 上限）、`CacheKey`（sha+文件+问题hash+模型四要素）。commit SHA 全链路补齐（克隆后 `rev-parse HEAD` → CloneResult → outcome）。新增单元 18（集成测试补 1 条真机 sha 断言）
 - T12 端到端验收：`PythonStubAnalyzer`（唯一新增生产文件，业务层零改动）+ 三个验收测试 + `docs/T12-验收报告.md`。五项验收全过：黄金样本 2/2、覆盖率 35/35=100%、引用行号 20/20=100%、缓存命中 P95=0ms、多语言扩展点结构断言。新增单元 3 + 集成 1
 - T12 补测（用户补齐三处遗留）：**第三黄金样本** `javastacks/spring-boot-best-practice`（37 模块/179 文件，golden 独立脚本生成 109 注解类+39 入口+6 依赖含跨模块边，首跑全过 0 解析失败）；**真实 LLM 档**（DeepSeek deepseek-chat，key 仅走环境变量）：20 问抽样两次实测 95.0% / 100.0%（每问至少一条引用命中地面真值文件），52/50 条引用结构合法 100%；前两个样本的 5 类描述已人工确认（golden 改注）。新增集成 4（覆盖率参数化 +3、真实 LLM 验收 1）
+- T13 LLM 配置抽象（多配置预留）：`LlmConfig`（id/provider/baseUrl/apiKey/model/isDefault + configured()）、`LlmConfigService`（list/getDefault/switchDefault/save/delete）、`InMemoryLlmConfigService`（单配置、yml 种子、只读）。客户端配置来源 LlmProperties → LlmConfigService.getDefault()，问答逻辑零改动。新增单元 7
 
 ## 本地运行（已实测通过）
 ```bash
@@ -166,3 +167,5 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：**真实 LLM 引用验收的指标口径（实测校准）**：引用级「全部落在期望文件」只有 48~50% —— LLM 回答时会自然引用锚点类的依赖文件（检索层本就连同 1 跳依赖提供），这不是错误。采纳「每问至少一条引用命中地面真值期望文件」为验收口径（两次实测 95.0% / 100.0%），结构合法率恒 100%；引用级命中率仅作信息性指标记录。LLM 非确定性如实记录（一次 19/20 带引用、一次 20/20）
 - 2026-09-18：**api-key 只走环境变量，绝不入库**：`CODESCOMPASS_LLM_API_KEY` + 启动参数 `--codecompass.llm.base-url=https://api.deepseek.com/v1 --codecompass.llm.model=deepseek-chat`；真实 LLM 验收测试用 `@EnabledIfEnvironmentVariable` 自动跳过无 key 环境
 - 2026-09-18：**踩坑 —— PowerShell 5.1 的 Get-Content/Set-Content 默认按系统 GBK 读写，会把 UTF-8 测试源码的中文整批变成乱码**。教训：改含中文的源文件一律用 edit/write 工具，绝不在 PowerShell 里做文本回写（本次已用 write 全量重写恢复，未造成提交污染）
+- 2026-09-18：**T13 LlmConfig 模型**：`default` 是 Java 保留字 → 字段名 `isDefault`；provider 是元数据标签不参与路由（协议统一 OpenAI 兼容）；apiKey 明文只限服务内部使用，日志/异常禁打印 config 对象，未来对外端点必须脱敏
+- 2026-09-18：**T13 switch/save/delete 显式抛 UnsupportedOperationException**（「配置以 application.yml 为准」）——客户端是启动时用默认配置构建的单例，假装支持运行时切换会交付悄悄失效的功能；真切换需要「客户端按请求解析配置」，留给未来多配置版本。问答链路（AnswerService/LlmClient 接口/检索/校验/限流）零改动，唯一触碰点是客户端配置来源

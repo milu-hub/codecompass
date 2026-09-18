@@ -54,22 +54,18 @@ class OpenAiCompatibleLlmClientTest {
     }
 
     private OpenAiCompatibleLlmClient configuredClient() {
-        LlmProperties properties = new LlmProperties();
-        properties.setBaseUrl(baseUrl);
-        properties.setApiKey("sk-test-123");
-        properties.setModel("deepseek-chat");
+        LlmConfig config = new LlmConfig("default", "deepseek", baseUrl, "sk-test-123", "deepseek-chat", true);
         return new OpenAiCompatibleLlmClient(
-                JsonMapper.builder().build(), RestClient.builder().build(), properties);
+                JsonMapper.builder().build(), RestClient.builder().build(), config);
     }
 
     @Test
     @DisplayName("未配置 api-key：立刻报错，不发任何网络请求")
     void notConfiguredThrows() {
-        LlmProperties properties = new LlmProperties();
-        properties.setBaseUrl(baseUrl);
+        LlmConfig config = new LlmConfig("default", "openai", baseUrl, "", "gpt-4o-mini", true);
 
         assertThatThrownBy(() -> new OpenAiCompatibleLlmClient(
-                JsonMapper.builder().build(), RestClient.builder().build(), properties)
+                JsonMapper.builder().build(), RestClient.builder().build(), config)
                 .complete("system", "user"))
                 .isInstanceOf(LlmException.class)
                 .hasMessageContaining("未配置");

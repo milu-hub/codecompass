@@ -91,7 +91,9 @@ codecompass:
 
   # T10：LLM 问答。api-key 留空 = 未配置，/ask 返回 502（绝不 500）。
   # 端点走 OpenAI 兼容协议，换 provider 只改配置不改代码。
+  # provider 是元数据标签（随 LlmConfig 模型透出），MVP 不参与路由。
   llm:
+    provider: openai
     base-url: https://api.openai.com/v1
     api-key: ${CODESCOMPASS_LLM_API_KEY:}
     model: gpt-4o-mini

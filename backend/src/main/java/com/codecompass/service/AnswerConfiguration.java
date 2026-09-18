@@ -16,14 +16,20 @@ import tools.jackson.databind.json.JsonMapper;
 public class AnswerConfiguration {
 
     @Bean
-    public LlmClient llmClient(JsonMapper jsonMapper, LlmProperties properties) {
+    public LlmConfigService llmConfigService(LlmProperties properties) {
+        return new InMemoryLlmConfigService(properties);
+    }
+
+    @Bean
+    public LlmClient llmClient(JsonMapper jsonMapper, LlmConfigService llmConfigService,
+                               LlmProperties properties) {
         // Boot 4.1 不提供 RestClient.Builder Bean（实测注入失败），这里自己建；
         // String 请求体/响应由 OpenAiCompatibleLlmClientTest 对同一构造路径实测过。
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout((int) properties.getTimeout().toMillis());
         requestFactory.setReadTimeout((int) properties.getTimeout().toMillis());
         RestClient restClient = RestClient.builder().requestFactory(requestFactory).build();
-        return new OpenAiCompatibleLlmClient(jsonMapper, restClient, properties);
+        return new OpenAiCompatibleLlmClient(jsonMapper, restClient, llmConfigService.getDefault());
     }
 
     @Bean

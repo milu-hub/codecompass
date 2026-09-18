@@ -23,27 +23,27 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
     private final JsonMapper jsonMapper;
     private final RestClient restClient;
-    private final LlmProperties properties;
+    private final LlmConfig config;
 
     public OpenAiCompatibleLlmClient(JsonMapper jsonMapper,
                                      RestClient restClient,
-                                     LlmProperties properties) {
+                                     LlmConfig config) {
         this.jsonMapper = jsonMapper;
         this.restClient = restClient;
-        this.properties = properties;
+        this.config = config;
     }
 
     @Override
     public String complete(String systemPrompt, String userPrompt) {
-        if (!properties.configured()) {
+        if (!config.configured()) {
             throw new LlmException("LLM 未配置：codecompass.llm.api-key 为空（或 base-url 未设置）");
         }
         String raw;
         try {
             raw = restClient.post()
-                    .uri(properties.getBaseUrl() + "/chat/completions")
+                    .uri(config.baseUrl() + "/chat/completions")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + config.apiKey())
                     .body(buildRequestBody(systemPrompt, userPrompt))
                     .retrieve()
                     .body(String.class);
@@ -58,7 +58,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private String buildRequestBody(String systemPrompt, String userPrompt) {
         try {
             return jsonMapper.writeValueAsString(Map.of(
-                    "model", properties.getModel(),
+                    "model", config.model(),
                     "messages", List.of(
                             Map.of("role", "system", "content", systemPrompt),
                             Map.of("role", "user", "content", userPrompt))));

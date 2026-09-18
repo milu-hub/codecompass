@@ -11,6 +11,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "codecompass.llm")
 public class LlmProperties {
 
+    /** 元数据标签（openai / deepseek / …）。MVP 不参与路由，仅随配置模型透出。 */
+    private String provider = "openai";
+
     private String baseUrl = "https://api.openai.com/v1";
 
     private String apiKey = "";
@@ -22,6 +25,14 @@ public class LlmProperties {
 
     /** 引用校验失败时的重试次数上限（含首次，共 maxAttempts 次调用）。 */
     private int maxAttempts = 3;
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
 
     public String getBaseUrl() {
         return baseUrl;
