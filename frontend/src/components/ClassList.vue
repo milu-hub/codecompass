@@ -110,8 +110,19 @@ const filtered = computed(() => {
   background: var(--cc-accent);
 }
 
+/* 角色/类型标签不参与收缩，长名字优先让位给省略号 */
+.class-row .el-tag {
+  flex-shrink: 0;
+}
+
+/* 长类名必须能收缩 + 省略号：否则它会把整行顶宽，
+   而 .class-list 的 overflow-y: auto 会让 overflow-x 计算成 auto，一超就冒横向滚动条 */
 .class-name {
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .progress-dot {
