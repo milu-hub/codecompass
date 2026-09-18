@@ -83,7 +83,7 @@ final class PythonStructureExtractor {
         fields.addAll(instanceFields(classDef, tokens));
 
         return new CodeUnitInfo(id, repositoryId, file.relativePath(), "python", "",
-                PythonModuleNames.packageName(modulePath), name, "class",
+                modulePath, name, "class",
                 decoratorNames(classDef.decorators()), fields, start, end);
     }
 
@@ -93,7 +93,7 @@ final class PythonStructureExtractor {
         String qualifiedName = PythonModuleNames.qualifiedName(modulePath, name);
         String id = PythonModuleNames.unitId(repositoryId, file.relativePath(), qualifiedName);
         return new CodeUnitInfo(id, repositoryId, file.relativePath(), "python", "",
-                PythonModuleNames.packageName(modulePath), name, "function",
+                modulePath, name, "function",
                 decoratorNames(function.decorators()), List.of(),
                 function.getStart().getLine(), endLine(function, tokens));
     }

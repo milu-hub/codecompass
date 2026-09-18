@@ -76,7 +76,7 @@ class PythonAnalyzerTest {
                 .filter(u -> u.name().equals("Point")).findFirst().orElseThrow();
         assertThat(point.id()).isEqualTo("repo:app/models.py#app.models.Point");
         assertThat(point.kind()).isEqualTo("class");
-        assertThat(point.packageName()).isEqualTo("app");
+        assertThat(point.packageName()).as("单元所在容器 = 模块路径").isEqualTo("app.models");
         assertThat(point.annotations()).containsExactly("dataclass");
         assertThat(point.startLine()).as("装饰器行计入范围").isEqualTo(3);
         assertThat(point.endLine()).as("块最后一行，不含 DEDENT 的下一行").isEqualTo(12);
@@ -97,6 +97,7 @@ class PythonAnalyzerTest {
                 .filter(u -> u.name().equals("run")).findFirst().orElseThrow();
         assertThat(run.kind()).isEqualTo("function");
         assertThat(run.id()).isEqualTo("repo:app/main.py#app.main.run");
+        assertThat(run.packageName()).isEqualTo("app.main");
         assertThat(run.startLine()).isEqualTo(3);
         assertThat(run.endLine()).isEqualTo(4);
     }
