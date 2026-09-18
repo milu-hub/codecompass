@@ -17,7 +17,7 @@ import com.codecompass.analyzer.AnalyzeRequest;
 import com.codecompass.analyzer.AnalyzeResult;
 import com.codecompass.analyzer.LanguageAnalyzer;
 import com.codecompass.analyzer.LanguageAnalyzerRegistry;
-import com.codecompass.analyzer.UnitRoleAnnotator;
+import com.codecompass.analyzer.UnitRoleAnnotatorRegistry;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.DependencyGraphBuilder;
 import com.codecompass.repo.CloneResult;
@@ -48,7 +48,7 @@ public class AnalysisOrchestrator {
     private final GitRepositoryCloner cloner;
     private final SourceFileScanner scanner;
     private final LanguageAnalyzerRegistry registry;
-    private final UnitRoleAnnotator roleAnnotator;
+    private final UnitRoleAnnotatorRegistry roleAnnotatorRegistry;
     private final DependencyGraphBuilder graphBuilder;
     private final TempWorkspaceManager tempWorkspaceManager;
 
@@ -57,7 +57,7 @@ public class AnalysisOrchestrator {
                                 GitRepositoryCloner cloner,
                                 SourceFileScanner scanner,
                                 LanguageAnalyzerRegistry registry,
-                                UnitRoleAnnotator roleAnnotator,
+                                UnitRoleAnnotatorRegistry roleAnnotatorRegistry,
                                 DependencyGraphBuilder graphBuilder,
                                 TempWorkspaceManager tempWorkspaceManager) {
         this.store = store;
@@ -65,7 +65,7 @@ public class AnalysisOrchestrator {
         this.cloner = cloner;
         this.scanner = scanner;
         this.registry = registry;
-        this.roleAnnotator = roleAnnotator;
+        this.roleAnnotatorRegistry = roleAnnotatorRegistry;
         this.graphBuilder = graphBuilder;
         this.tempWorkspaceManager = tempWorkspaceManager;
     }
@@ -119,7 +119,9 @@ public class AnalysisOrchestrator {
                             + "，已支持 " + registry.supportedLanguages()));
 
             AnalyzeResult result = analyzer.analyze(new AnalyzeRequest(url, repoDir, files));
-            Map<String, String> roles = roleAnnotator.annotate(result);
+            Map<String, String> roles = roleAnnotatorRegistry.forLanguage(language)
+                    .map(annotator -> annotator.annotate(result))
+                    .orElse(Map.of());
 
             store.update(taskId, snapshot -> snapshot.withProgress(
                     AnalysisTaskSnapshot.STATUS_RUNNING, 90, "构建依赖图"));

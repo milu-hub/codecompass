@@ -97,6 +97,46 @@ codecompass:
       - '@Entity'
       - '@Mapper'
 
+    # P5：Python 的角色与框架识别（PYTHON_ANALYZER_PLAN.md §3.5）。
+    # Python 没有注解，靠装饰器名与模块路径约定。装饰器名按「裸名」匹配
+    # （分析器把 @app.route("/x") 归一成 app.route），模块路径取末段（models/views）。
+    python:
+      framework-markers:
+        flask:
+          - 'app.route'
+          - 'flask'
+        fastapi:
+          - 'router.get'
+          - 'router.post'
+          - 'fastapi'
+          - 'api_route'
+        django:
+          - 'api_view'
+          - 'django'
+          - 'admin'
+      decorator-roles:
+        controller:
+          - 'app.route'
+          - 'app.get'
+          - 'app.post'
+          - 'app.put'
+          - 'app.delete'
+          - 'app.patch'
+          - 'router.get'
+          - 'router.post'
+          - 'router.put'
+          - 'router.delete'
+          - 'router.patch'
+          - 'api_view'
+        entity:
+          - 'dataclass'
+          - 'attrs.define'
+      module-roles:
+        entity:
+          - 'models'
+        controller:
+          - 'views'
+
   clone:
     # git 可执行文件。默认 "git"，依赖 PATH。
     git-executable: git

@@ -18,6 +18,7 @@ import org.mockito.Mockito;
 
 import com.codecompass.analyzer.LanguageAnalyzerRegistry;
 import com.codecompass.analyzer.java.CoreAnnotationClassifier;
+import com.codecompass.analyzer.UnitRoleAnnotatorRegistry;
 import com.codecompass.analyzer.java.JavaAnalyzeProperties;
 import com.codecompass.analyzer.java.JavaSpringAnalyzer;
 import com.codecompass.graph.DependencyGraphBuilder;
@@ -84,7 +85,7 @@ class AnalysisOrchestratorTest {
             return thread;
         });
         orchestrator = new AnalysisOrchestrator(store, executor, cloner, scanner, registry,
-                classifier, graphBuilder, tempWorkspaceManager);
+                new UnitRoleAnnotatorRegistry(List.of(classifier)), graphBuilder, tempWorkspaceManager);
     }
 
     @AfterEach
@@ -178,7 +179,8 @@ class AnalysisOrchestratorTest {
                 .thenReturn(List.of(new CodeUnitFileInfo("a.klingon", "", "", "klingon")));
         AnalysisOrchestrator klingonOrchestrator = new AnalysisOrchestrator(
                 store, executor, cloner, klingonScanner,
-                new LanguageAnalyzerRegistry(List.of()), new CoreAnnotationClassifier(new JavaAnalyzeProperties()),
+                new LanguageAnalyzerRegistry(List.of()),
+                new UnitRoleAnnotatorRegistry(List.of(new CoreAnnotationClassifier(new JavaAnalyzeProperties()))),
                 new DependencyGraphBuilder(new MermaidRenderer()), tempWorkspaceManager);
 
         String taskId = klingonOrchestrator.submit("https://github.com/a/b");

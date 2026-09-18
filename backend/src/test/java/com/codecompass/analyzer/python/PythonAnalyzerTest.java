@@ -2,7 +2,9 @@ package com.codecompass.analyzer.python;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,7 +56,8 @@ class PythonAnalyzerTest {
     Path repoRoot;
 
     private AnalyzeResult analyze(List<CodeUnitFileInfo> files) {
-        return new PythonAnalyzer().analyze(new AnalyzeRequest("repo", repoRoot, files));
+        return new PythonAnalyzer(new PythonAnalyzeProperties()).analyze(
+                new AnalyzeRequest("repo", repoRoot, files));
     }
 
     private CodeUnitFileInfo py(String relativePath) {
@@ -127,6 +130,28 @@ class PythonAnalyzerTest {
 
         assertThat(second.codeUnits()).containsExactlyElementsOf(first.codeUnits());
         assertThat(second.methods()).containsExactlyElementsOf(first.methods());
+    }
+
+    @Test
+    @DisplayName("框架识别：装饰器命中 framework-markers → framework 字段（P5）")
+    void detectsFrameworkFromDecorators() throws Exception {
+        write("app.py", """
+                from flask import Flask
+
+                app = Flask(__name__)
+
+                @app.route("/")
+                def index():
+                    return "hi"
+                """);
+        PythonAnalyzeProperties properties = new PythonAnalyzeProperties();
+        properties.setFrameworkMarkers(new LinkedHashMap<>(Map.of("flask", List.of("app.route", "flask"))));
+
+        AnalyzeResult result = new PythonAnalyzer(properties).analyze(
+                new AnalyzeRequest("repo", repoRoot, List.of(py("app.py"))));
+
+        assertThat(result.framework()).isEqualTo("flask");
+        assertThat(result.codeUnits()).extracting(CodeUnitInfo::name).containsExactly("index");
     }
 
     private void write(String relativePath, String content) throws Exception {

@@ -19,4 +19,11 @@ public class AnalyzerConfiguration {
             ObjectProvider<LanguageAnalyzer> analyzers) {
         return new LanguageAnalyzerRegistry(analyzers.stream().toList());
     }
+
+    /** P5：角色标注器同样按语言查表，加语言不再动业务层。 */
+    @Bean
+    public UnitRoleAnnotatorRegistry unitRoleAnnotatorRegistry(
+            ObjectProvider<UnitRoleAnnotator> annotators) {
+        return new UnitRoleAnnotatorRegistry(annotators.stream().toList());
+    }
 }

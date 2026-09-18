@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.codecompass.analyzer.LanguageAnalyzerRegistry;
-import com.codecompass.analyzer.UnitRoleAnnotator;
+import com.codecompass.analyzer.UnitRoleAnnotatorRegistry;
 import com.codecompass.graph.DependencyGraphBuilder;
 import com.codecompass.repo.GitRepositoryCloner;
 import com.codecompass.repo.SourceFileScanner;
@@ -42,11 +42,11 @@ public class AnalysisConfiguration {
                                                     GitRepositoryCloner gitRepositoryCloner,
                                                     SourceFileScanner sourceFileScanner,
                                                     LanguageAnalyzerRegistry languageAnalyzerRegistry,
-                                                    UnitRoleAnnotator unitRoleAnnotator,
+                                                    UnitRoleAnnotatorRegistry unitRoleAnnotatorRegistry,
                                                     DependencyGraphBuilder dependencyGraphBuilder,
                                                     TempWorkspaceManager tempWorkspaceManager) {
         return new AnalysisOrchestrator(analysisTaskStore, analysisExecutor, gitRepositoryCloner,
-                sourceFileScanner, languageAnalyzerRegistry, unitRoleAnnotator,
+                sourceFileScanner, languageAnalyzerRegistry, unitRoleAnnotatorRegistry,
                 dependencyGraphBuilder, tempWorkspaceManager);
     }
 }

@@ -148,6 +148,11 @@ public class CoreAnnotationClassifier implements UnitRoleAnnotator {
 
     /** 实现 {@link UnitRoleAnnotator}：产出 id → 角色 映射，供语言中立的编排层使用。 */
     @Override
+    public String language() {
+        return "java";
+    }
+
+    @Override
     public Map<String, String> annotate(AnalyzeResult result) {
         Map<String, String> roles = new LinkedHashMap<>();
         if (result == null) {

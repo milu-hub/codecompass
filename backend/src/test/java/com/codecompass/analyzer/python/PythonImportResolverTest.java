@@ -33,7 +33,8 @@ class PythonImportResolverTest {
         List<CodeUnitFileInfo> infos = files.stream()
                 .map(path -> new CodeUnitFileInfo(path, "", "", "python"))
                 .toList();
-        return new PythonAnalyzer().analyze(new AnalyzeRequest("repo", repoRoot, infos));
+        return new PythonAnalyzer(new PythonAnalyzeProperties()).analyze(
+                new AnalyzeRequest("repo", repoRoot, infos));
     }
 
     private void write(String relativePath, String content) throws Exception {

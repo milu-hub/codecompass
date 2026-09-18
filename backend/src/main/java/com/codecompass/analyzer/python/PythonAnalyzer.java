@@ -28,11 +28,17 @@ import com.codecompass.repo.CodeUnitFileInfo;
  * <p>本类替换 T12 的 {@code PythonStubAnalyzer}：stub 的使命是证明"加语言只加一个实现"，
  * 现在换成真实现，注册表与业务层一行不改。
  *
- * <p>P3 产出结构（类 / 模块级函数 / 方法 / 字段）；P4 在此基础上产出依赖边（import 矩阵）。
- * 框架识别（Django/Flask/FastAPI）在 P5，本类 framework 恒为空。
+ * <p>P3 产出结构（类 / 模块级函数 / 方法 / 字段）；P4 在此基础上产出依赖边（import 矩阵）；
+ * P5 识别框架（Django/Flask/FastAPI，见 application.yml 的 analyze.python.*）。
  */
 @Component
 public class PythonAnalyzer implements LanguageAnalyzer {
+
+    private final PythonAnalyzeProperties properties;
+
+    public PythonAnalyzer(PythonAnalyzeProperties properties) {
+        this.properties = properties;
+    }
 
     @Override
     public String language() {
@@ -86,7 +92,21 @@ public class PythonAnalyzer implements LanguageAnalyzer {
         methods.sort(Comparator.comparing(MethodInfo::id));
         List<DependencyEdge> dependencies =
                 importResolver.resolve(request.repositoryId(), units, unitIdsByFile, importsByFile);
-        return new AnalyzeResult(request.repositoryId(), "python", "", units, methods, dependencies, failedFiles);
+        String framework = detectFramework(units);
+        return new AnalyzeResult(request.repositoryId(), "python", framework, units, methods, dependencies, failedFiles);
+    }
+
+    /** 框架识别（P5）：扫全部单元的装饰器，按配置声明顺序取第一个命中者；无则空串。 */
+    private String detectFramework(List<CodeUnitInfo> units) {
+        for (Map.Entry<String, List<String>> framework : properties.getFrameworkMarkers().entrySet()) {
+            for (CodeUnitInfo unit : units) {
+                if (unit.annotations() != null
+                        && framework.getValue().stream().anyMatch(unit.annotations()::contains)) {
+                    return framework.getKey();
+                }
+            }
+        }
+        return "";
     }
 
     private static String read(Path root, String relativePath) {
