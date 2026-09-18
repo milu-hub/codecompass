@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.codecompass.persistence.LearningPathRepository;
+import com.codecompass.persistence.NoteRepository;
 import com.codecompass.persistence.QaHistoryRepository;
 import com.codecompass.persistence.ShareSnapshotRepository;
 
@@ -26,8 +27,9 @@ public class ShareConfiguration {
     @Bean
     public ShareService shareService(QaHistoryRepository qaHistoryRepository,
                                      LearningPathRepository learningPathRepository,
+                                     NoteRepository noteRepository,
                                      JsonMapper jsonMapper, Clock clock, ShareProperties properties) {
-        return new ShareService(qaHistoryRepository, learningPathRepository,
+        return new ShareService(qaHistoryRepository, learningPathRepository, noteRepository,
                 jsonMapper, clock, properties);
     }
 }

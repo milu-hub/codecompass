@@ -193,7 +193,9 @@ async function onSubmit() {
 
   <!-- F6：分享短链弹窗（只读分享页由后端渲染，见 /share/{id}） -->
   <el-dialog v-model="shareDialogVisible" title="分享领读页" width="520">
-    <p class="share-hint">任何人（无需 Cookie）都可打开这条短链，页面为只读。</p>
+    <p class="share-hint">
+      任何人（无需 Cookie）都可打开这条短链，页面为只读，包含依赖图、学习路线、问答记录与你自己的笔记。
+    </p>
     <div class="share-link-row">
       <el-input v-model="shareUrl" readonly />
       <el-button type="primary" @click="copyShareLink">复制</el-button>

@@ -61,7 +61,8 @@ class ShareControllerTest {
         when(shareService.build(any(), anyString(), anyString(), anyString(), anyString(), any()))
                 .thenReturn(new ShareSnapshot("https://github.com/a/b", "sha-1",
                         Instant.parse("2026-09-18T12:00:00Z"), "graph LR\n  A --> B",
-                        List.of(), List.of(), List.of()));
+                        List.of(), List.of(), List.of(),
+                        List.of(new ShareSnapshot.NoteBrief("OwnerController", "入口类先读", null))));
         ClientIdentityHolder.set("client-1");
         mockMvc = MockMvcBuilders.standaloneSetup(new ShareController(
                 store, shareService, repository, achievementService,
@@ -109,7 +110,8 @@ class ShareControllerTest {
                 "sha-1",
                 "{\"repoUrl\":\"https://github.com/a/b\",\"commitSha\":\"sha-1\","
                         + "\"generatedAt\":\"2026-09-18T12:00:00Z\",\"graphMermaid\":\"graph LR\\n  A --> B\","
-                        + "\"learningPath\":[],\"qaSamples\":[],\"achievements\":[]}",
+                        + "\"learningPath\":[],\"qaSamples\":[],\"achievements\":[],"
+                        + "\"notes\":[{\"codeUnitName\":\"OwnerController\",\"content\":\"入口类先读\",\"updatedAt\":null}]}",
                 Instant.parse("2026-10-18T12:00:00Z"), Instant.parse("2026-09-18T12:00:00Z"));
         when(repository.findById("abc123def456")).thenReturn(Optional.of(entity));
 
@@ -119,6 +121,25 @@ class ShareControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(html).contains("mermaid", "A --&gt; B", "由 CodeCompass 生成");
+        assertThat(html).contains("笔记", "OwnerController", "入口类先读");
+    }
+
+    @Test
+    @DisplayName("旧快照（无 notes 字段）反序列化不炸，笔记段落显示空态")
+    void legacySnapshotWithoutNotesStillRenders() throws Exception {
+        ShareSnapshotEntity entity = new ShareSnapshotEntity("legacy123456", "https://github.com/a/b",
+                "sha-1",
+                "{\"repoUrl\":\"https://github.com/a/b\",\"commitSha\":\"sha-1\","
+                        + "\"generatedAt\":\"2026-09-18T12:00:00Z\",\"graphMermaid\":\"graph LR\","
+                        + "\"learningPath\":[],\"qaSamples\":[],\"achievements\":[]}",
+                Instant.parse("2026-10-18T12:00:00Z"), Instant.parse("2026-09-18T12:00:00Z"));
+        when(repository.findById("legacy123456")).thenReturn(Optional.of(entity));
+
+        String html = mockMvc.perform(get("/share/legacy123456"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("笔记").contains("暂无笔记");
     }
 
     @Test

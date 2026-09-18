@@ -3,6 +3,7 @@ package com.codecompass.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -11,6 +12,8 @@ import java.util.stream.Collectors;
 import com.codecompass.analyzer.AnalyzeResult;
 import com.codecompass.persistence.LearningPathEntity;
 import com.codecompass.persistence.LearningPathRepository;
+import com.codecompass.persistence.NoteEntity;
+import com.codecompass.persistence.NoteRepository;
 import com.codecompass.persistence.QaHistoryEntity;
 import com.codecompass.persistence.QaHistoryRepository;
 
@@ -19,21 +22,25 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * F6 分享快照构建：只取公开、脱敏的信息 ——
  * 依赖图 mermaid（无源码）、学习路线（reason 而已）、分享者自己的前 10 条问答
- * （answer 与引用，无源码内容）、成就的 code+name（无 clientId/unlockedAt）。
+ * （answer 与引用，无源码内容）、成就的 code+name（无 clientId/unlockedAt）、
+ * **分享者自己的笔记**（他人笔记绝不出现在分享页）。
  */
 public class ShareService {
 
     private final QaHistoryRepository qaHistoryRepository;
     private final LearningPathRepository learningPathRepository;
+    private final NoteRepository noteRepository;
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final ShareProperties properties;
 
     public ShareService(QaHistoryRepository qaHistoryRepository,
                         LearningPathRepository learningPathRepository,
+                        NoteRepository noteRepository,
                         JsonMapper jsonMapper, Clock clock, ShareProperties properties) {
         this.qaHistoryRepository = qaHistoryRepository;
         this.learningPathRepository = learningPathRepository;
+        this.noteRepository = noteRepository;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
         this.properties = properties;
@@ -80,8 +87,18 @@ public class ShareService {
                                 achievement.code(), achievement.name()))
                         .toList();
 
+        // 笔记：只取分享者本人的（repository 按 clientId 过滤），按更新时间倒序
+        List<ShareSnapshot.NoteBrief> notes = noteRepository
+                .findByClientIdAndRepoUrl(clientId, repoUrl).stream()
+                .sorted(Comparator.comparing(NoteEntity::getUpdatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(note -> new ShareSnapshot.NoteBrief(
+                        unitNames.getOrDefault(note.getCodeUnitId(), note.getCodeUnitId()),
+                        note.getContent(), note.getUpdatedAt()))
+                .toList();
+
         return new ShareSnapshot(repoUrl, commitSha, clock.instant(),
-                graphMermaid, pathSteps, qaSamples, briefs);
+                graphMermaid, pathSteps, qaSamples, briefs, notes);
     }
 
     /** 短链 id：12 位 hex。 */

@@ -18,8 +18,8 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * F6 端到端验收：真实 petclinic → 生成分享快照 → 无 Cookie 打开短链页，
- * 页面含依赖图且不含敏感信息。需要网络（克隆），@Tag("integration")。
+ * F6 端到端验收：真实 petclinic → 写笔记 → 生成分享快照 → 无 Cookie 打开短链页，
+ * 页面含依赖图与**分享者本人的笔记**，且不含敏感信息。需要网络（克隆），@Tag("integration")。
  */
 @Tag("integration")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -35,27 +35,37 @@ class ShareAcceptanceIntegrationTest {
             .build();
 
     @Test
-    @DisplayName("真实 petclinic：短链在无 Cookie 浏览器打开，含依赖图，无敏感信息")
+    @DisplayName("真实 petclinic：短链在无 Cookie 浏览器打开，含依赖图与本人笔记，无敏感信息")
     void shareAcceptance() throws Exception {
         JsonMapper mapper = JsonMapper.builder().build();
 
-        HttpResponse<String> submit = post("/api/repos", "{\"url\": \"" + PETCLINIC + "\"}", null);
+        // 先建立匿名身份（后续写笔记与生成分享必须是同一个 clientId）
+        HttpResponse<String> me = get("/api/me", null);
+        assertThat(me.statusCode()).isEqualTo(200);
+        String cookie = me.headers().firstValue("Set-Cookie").orElseThrow().split(";")[0];
+
+        HttpResponse<String> submit = post("/api/repos", "{\"url\": \"" + PETCLINIC + "\"}", cookie);
         assertThat(submit.statusCode()).isEqualTo(201);
         String taskId = mapper.readTree(submit.body()).get("taskId").asString();
         long deadline = System.nanoTime() + Duration.ofSeconds(120).toNanos();
+        String state = "";
         while (System.nanoTime() < deadline) {
-            HttpResponse<String> status = get("/api/repos/" + taskId + "/status", null);
-            String state = mapper.readTree(status.body()).get("status").asString();
-            if (state.equals("done")) {
+            HttpResponse<String> status = get("/api/repos/" + taskId + "/status", cookie);
+            state = mapper.readTree(status.body()).get("status").asString();
+            if (state.equals("done") || state.equals("failed")) {
                 break;
-            }
-            if (state.equals("failed")) {
-                throw new AssertionError("分析失败：" + status.body());
             }
             Thread.sleep(500);
         }
+        assertThat(state).isEqualTo("done");
 
-        HttpResponse<String> share = post("/api/repos/" + taskId + "/share", null, null);
+        // 写一条本人笔记 —— 分享页必须带上它（笔记没有别的"另存"途径）
+        String noteContent = "分享页笔记验证：入口类先读";
+        assertThat(post("/api/notes", "{\"repoUrl\":\"" + PETCLINIC
+                + "\",\"codeUnitId\":\"repo:unit-1\",\"content\":\"" + noteContent + "\"}", cookie)
+                .statusCode()).isEqualTo(200);
+
+        HttpResponse<String> share = post("/api/repos/" + taskId + "/share", null, cookie);
         assertThat(share.statusCode()).isEqualTo(200);
         String sharePath = mapper.readTree(share.body()).path("url").asText();
         assertThat(sharePath).startsWith("/share/");
@@ -65,6 +75,7 @@ class ShareAcceptanceIntegrationTest {
         assertThat(page.statusCode()).isEqualTo(200);
         String html = page.body();
         assertThat(html).contains("由 CodeCompass 生成").contains("mermaid");
+        assertThat(html).contains("笔记").contains(noteContent);
         // 脱敏：不得出现完整源码片段与任何 API key 字样
         assertThat(html).doesNotContain("class OwnerController {").doesNotContain("sk-");
     }

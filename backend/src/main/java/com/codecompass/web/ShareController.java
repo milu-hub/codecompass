@@ -149,6 +149,17 @@ public class ShareController {
             }
         }
 
+        // 笔记：只含分享者本人的（快照构建阶段已按 clientId 过滤）
+        body.append("<h2>笔记</h2>");
+        if (snapshot.notes().isEmpty()) {
+            body.append("<p>暂无笔记</p>");
+        } else {
+            for (ShareSnapshot.NoteBrief note : snapshot.notes()) {
+                body.append("<p><b>").append(escape(note.codeUnitName())).append("</b></p>");
+                body.append("<pre class=\"note\">").append(escape(note.content())).append("</pre>");
+            }
+        }
+
         body.append("<h2>成就</h2><ul>");
         for (ShareSnapshot.AchievementBrief brief : snapshot.achievements()) {
             body.append("<li>").append(escape(brief.name())).append("（").append(escape(brief.code())).append("）</li>");
@@ -160,6 +171,7 @@ public class ShareController {
                 + "<script src=\"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js\"></script>"
                 + "<style>body{font-family:sans-serif;max-width:900px;margin:24px auto;padding:0 16px;}"
                 + "pre.mermaid{background:#fafafa;padding:12px;border-radius:6px;overflow:auto;}"
+                + "pre.note{background:#fffbe6;padding:10px;border-radius:6px;white-space:pre-wrap;}"
                 + "footer{margin-top:32px;color:#999;font-size:12px;}</style></head><body>"
                 + body
                 + "<footer>由 CodeCompass 生成</footer>"

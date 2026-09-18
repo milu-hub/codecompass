@@ -4,7 +4,7 @@
 无 —— F2/F4/F5/F6 按 T13～T24 全部交付（验收见 `docs/T23-验收报告.md`）
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 304 + 集成 28 = 332，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 306 + 集成 28 = 334，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -198,3 +198,4 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - T22 F6 分享页前端：结果区「生成分享页」按钮 + 短链弹窗（复制/打开）；分享页本体是后端渲染 HTML（FEATURE_SPEC 明确不复用 SPA）。**补齐 Vite `/share` 代理**（dev 下短链走 :5173，不代理会 404 —— 与 T8 补 /api 代理同款）。真机走查：弹窗短链可用，分享页 200 且含依赖图/学习路线/问答/页脚、不含源码
 - T23 端到端验收：**327 全绿**（单元 299 + 集成 28，含真机克隆 3 样本 + 真 MySQL + 真实 DeepSeek），`docs/T23-验收报告.md` 逐项映射证据。本轮修 2 类**双方言测试断言**：① JSON 列回环改「解析后 JSON 树相等」（MySQL 会规范化 JSON 格式，字节比较只在 H2 成立）；② 仓储测试改 @Transactional + 每轮唯一键（真 MySQL 不随测试重建，固定键会被上轮残留挡住）
 - T24 UI 统一修正：`MermaidRenderer` 按角色输出 classDef/class（entry 橙 / controller 蓝 / service 绿 / entity 灰 / mapper 紫 / repository 青，顺序与节点顺序固定保证确定性）；core-annotations 加 entity/mapper 两个非 Spring 角色 + `role-only-annotations` 配置（把它们从「未进 framework-markers」漂移告警里排除，避免纯 JPA 仓库被误判成 Spring）；前端三栏（左类列表+进度 / 中源码+问答 / 右 Tab：依赖图·学习路线·测验·笔记·成就），**默认不铺全图也不预选类**，点类才出邻域。真机走查：默认提示、点类出邻域、五 Tab、问答 12 条引用全通。新增单元 5
+- T24 增量（用户要求）：**分享页加入本人笔记** —— 笔记没有别的"另存"途径，分享是唯一出口。`ShareSnapshot` 增 `notes[]`（类名+内容+更新时间，紧凑构造器对旧快照缺字段规范化空列表），`ShareService` 按 **clientId 过滤只取分享者本人**笔记（按更新时间倒序），`ShareController` 增「笔记」段落（HTML 转义/空态）。真机走查：写笔记 → 生成分享 → 无 Cookie 打开页面含笔记正文 ✓。新增单元 2
