@@ -100,4 +100,52 @@ class MermaidRendererTest {
                 .as("渲染器只画声明过的节点，悬空边必须在更早的图构建阶段被过滤")
                 .doesNotContain("-->");
     }
+
+    // ---------- T24：角色配色 ----------
+
+    private static GraphNode roleNode(String id, String label, String role) {
+        return new GraphNode(id, label, "com.example." + label, "class", role, "f.java", 1, 9);
+    }
+
+    @Test
+    @DisplayName("按角色输出 classDef + class：entry 橙 / controller 蓝；未出现的角色不输出")
+    void colorsNodesByRole() {
+        String mermaid = renderer.render(List.of(
+                roleNode("id-a", "App", "entry"),
+                roleNode("id-b", "Ctrl", "controller"),
+                node("id-c", "Plain")), List.of());
+
+        assertThat(mermaid)
+                .contains("classDef role_entry fill:#fa8c16")
+                .contains("class n0 role_entry")
+                .contains("classDef role_controller fill:#1677ff")
+                .contains("class n1 role_controller");
+        assertThat(mermaid)
+                .as("未出现的角色不输出 classDef")
+                .doesNotContain("role_entity")
+                .doesNotContain("role_mapper");
+        assertThat(mermaid)
+                .as("无角色节点不挂 class")
+                .doesNotContain("class n2");
+    }
+
+    @Test
+    @DisplayName("同角色多节点合并到一条 class 行（逗号分隔，按 id 顺序）")
+    void mergesSameRoleNodes() {
+        String mermaid = renderer.render(List.of(
+                roleNode("id-a", "A", "service"),
+                roleNode("id-b", "B", "service")), List.of());
+
+        assertThat(mermaid).contains("class n0,n1 role_service");
+    }
+
+    @Test
+    @DisplayName("带角色时渲染仍确定性：输入顺序无关")
+    void roleRenderingIsDeterministic() {
+        GraphNode a = roleNode("id-a", "A", "entry");
+        GraphNode b = roleNode("id-b", "B", "service");
+
+        assertThat(renderer.render(List.of(a, b), List.of()))
+                .isEqualTo(renderer.render(List.of(b, a), List.of()));
+    }
 }

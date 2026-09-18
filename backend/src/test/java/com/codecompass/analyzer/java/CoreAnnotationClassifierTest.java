@@ -45,6 +45,37 @@ class CoreAnnotationClassifierTest {
         return new CoreAnnotationClassifier(springProperties());
     }
 
+    // ---------- T24：非框架注解的角色（entity / mapper） ----------
+
+    @Test
+    @DisplayName("非框架注解也可作角色：@Entity → entity、@Mapper → mapper")
+    void nonFrameworkAnnotationsCanBeRoles() {
+        JavaAnalyzeProperties properties = springProperties();
+        Map<String, List<String>> roles = new LinkedHashMap<>();
+        roles.put("entity", List.of("@Entity"));
+        roles.put("mapper", List.of("@Mapper"));
+        properties.setCoreAnnotations(Map.of(SPRING, roles));
+        CoreAnnotationClassifier classifier = new CoreAnnotationClassifier(properties);
+
+        assertThat(classifier.roleOf(unit("A", SPRING, "@Entity"))).contains("entity");
+        assertThat(classifier.roleOf(unit("B", SPRING, "@Mapper"))).contains("mapper");
+    }
+
+    @Test
+    @DisplayName("role-only 注解不计入配置漂移告警（@Entity/@Mapper 不是框架标记）")
+    void roleOnlyAnnotationsAreExcludedFromDriftWarning() {
+        JavaAnalyzeProperties properties = springProperties();
+        Map<String, List<String>> roles = new LinkedHashMap<>();
+        roles.put("entity", List.of("@Entity"));
+        roles.put("mapper", List.of("@Mapper"));
+        properties.setCoreAnnotations(Map.of(SPRING, roles));
+        properties.setRoleOnlyAnnotations(List.of("@Entity", "@Mapper"));
+
+        CoreAnnotationClassifier classifier = new CoreAnnotationClassifier(properties);
+
+        assertThat(classifier.annotationsMissingFromFrameworkMarkers()).isEmpty();
+    }
+
     private static CodeUnitInfo unit(String name, String framework, String... annotations) {
         return new CodeUnitInfo("repo-1:f.java#" + name, "repo-1", "f.java", "java", framework,
                 "com.example", name, "class", List.of(annotations), List.of(), 1, 10);

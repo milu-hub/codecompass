@@ -1,5 +1,6 @@
 package com.codecompass.analyzer.java;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,14 @@ public class JavaAnalyzeProperties {
      */
     private Map<String, Map<String, List<String>>> coreAnnotations = new LinkedHashMap<>();
 
+    /**
+     * 只作角色、不作框架判定的注解（如 JPA 的 {@code @Entity}、MyBatis 的 {@code @Mapper}）。
+     *
+     * <p>它们不是框架标记（放进 framework-markers 会让「纯 JPA 仓库」被误判成 Spring），
+     * 所以从「core-annotations 未进 framework-markers」的一致性告警里排除。
+     */
+    private List<String> roleOnlyAnnotations = new ArrayList<>();
+
     public JavaSettings getJava() {
         return java;
     }
@@ -55,6 +64,14 @@ public class JavaAnalyzeProperties {
 
     public void setCoreAnnotations(Map<String, Map<String, List<String>>> coreAnnotations) {
         this.coreAnnotations = coreAnnotations;
+    }
+
+    public List<String> getRoleOnlyAnnotations() {
+        return roleOnlyAnnotations;
+    }
+
+    public void setRoleOnlyAnnotations(List<String> roleOnlyAnnotations) {
+        this.roleOnlyAnnotations = roleOnlyAnnotations == null ? new ArrayList<>() : roleOnlyAnnotations;
     }
 
     public static class JavaSettings {

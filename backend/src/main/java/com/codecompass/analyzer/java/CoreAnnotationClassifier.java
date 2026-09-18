@@ -41,10 +41,12 @@ public class CoreAnnotationClassifier implements UnitRoleAnnotator {
 
     private final Map<String, Map<String, Set<String>>> coreAnnotationsByFramework;
     private final Map<String, Set<String>> frameworkMarkersByFramework;
+    private final Set<String> roleOnlyAnnotations;
 
     public CoreAnnotationClassifier(JavaAnalyzeProperties properties) {
         this.coreAnnotationsByFramework = normalizeCoreAnnotations(properties.getCoreAnnotations());
         this.frameworkMarkersByFramework = normalizeFrameworkMarkers(properties.getFrameworkMarkers());
+        this.roleOnlyAnnotations = normalizeAll(properties.getRoleOnlyAnnotations());
 
         Set<String> missing = annotationsMissingFromFrameworkMarkers();
         if (!missing.isEmpty()) {
@@ -137,6 +139,8 @@ public class CoreAnnotationClassifier implements UnitRoleAnnotator {
             roles.values().stream()
                     .flatMap(Set::stream)
                     .filter(annotation -> !markers.contains(annotation))
+                    // 只作角色的注解（@Entity/@Mapper 等非框架注解）不算配置漂移
+                    .filter(annotation -> !roleOnlyAnnotations.contains(annotation))
                     .forEach(missing::add);
         });
         return missing;

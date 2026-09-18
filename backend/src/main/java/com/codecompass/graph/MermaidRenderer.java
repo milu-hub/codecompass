@@ -19,8 +19,24 @@ import com.codecompass.analyzer.DependencyEdge;
  * 渲染必须逐字节一致，否则前端 diff 与快照测试全废。
  *
  * <p><b>空图降级</b>：只有 {@code graph LR} 一行时 Mermaid 渲染不可靠，故空图输出占位节点。
+ *
+ * <p><b>T24 角色配色</b>：按节点角色输出 {@code classDef} + {@code class} 行
+ * （entry 橙 / controller 蓝 / service 绿 / entity 灰 / mapper 紫 / repository 青）。
+ * 配色顺序与节点顺序都固定，保持渲染确定性。
  */
 public class MermaidRenderer {
+
+    /** 角色 → 填充色。顺序即 classDef 输出顺序（确定性）。 */
+    private static final Map<String, String> ROLE_STYLES = new LinkedHashMap<>();
+
+    static {
+        ROLE_STYLES.put("entry", "fill:#fa8c16,stroke:#d46b08,color:#ffffff");
+        ROLE_STYLES.put("controller", "fill:#1677ff,stroke:#0958d9,color:#ffffff");
+        ROLE_STYLES.put("service", "fill:#52c41a,stroke:#389e0d,color:#ffffff");
+        ROLE_STYLES.put("entity", "fill:#8c8c8c,stroke:#595959,color:#ffffff");
+        ROLE_STYLES.put("mapper", "fill:#722ed1,stroke:#531dab,color:#ffffff");
+        ROLE_STYLES.put("repository", "fill:#13c2c2,stroke:#08979c,color:#ffffff");
+    }
 
     public String render(List<GraphNode> nodes, List<DependencyEdge> edges) {
         List<GraphNode> sorted = nodes == null ? List.of()
@@ -52,7 +68,26 @@ public class MermaidRenderer {
                 out.append("  ").append(from).append(" --> ").append(to).append("\n");
             }
         }
+        appendRoleStyles(out, sorted, idByUnitId);
         return out.toString();
+    }
+
+    /** 角色配色：只对出现过的角色输出 classDef，节点 class 行按 id 顺序（确定性）。 */
+    private static void appendRoleStyles(StringBuilder out, List<GraphNode> sorted,
+                                         Map<String, String> idByUnitId) {
+        ROLE_STYLES.forEach((role, style) -> {
+            List<String> nodeIds = sorted.stream()
+                    .filter(node -> role.equals(node.role()))
+                    .map(node -> idByUnitId.get(node.id()))
+                    .toList();
+            if (nodeIds.isEmpty()) {
+                return;
+            }
+            String className = "role_" + role;
+            out.append("  classDef ").append(className).append(' ').append(style).append('\n');
+            out.append("  class ").append(String.join(",", nodeIds))
+                    .append(' ').append(className).append('\n');
+        });
     }
 
     private static String escapeLabel(String label) {

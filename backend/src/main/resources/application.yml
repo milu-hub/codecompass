@@ -74,6 +74,18 @@ codecompass:
         member:
           - '@Autowired'
           - '@Bean'
+        # T24：图按角色配色引入的两个非 Spring 角色（JPA 实体 / MyBatis 映射器）
+        entity:
+          - '@Entity'
+        mapper:
+          - '@Mapper'
+
+    # T24：只作角色、不作框架判定的注解 —— 从「core-annotations 未进 framework-markers」
+    # 的一致性告警里排除（@Entity/@Mapper 是 JPA/MyBatis 注解，进了 framework-markers
+    # 会让「纯 JPA 仓库」被误判成 Spring）。
+    role-only-annotations:
+      - '@Entity'
+      - '@Mapper'
 
   clone:
     # git 可执行文件。默认 "git"，依赖 PATH。

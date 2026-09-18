@@ -120,10 +120,9 @@ export const useRepositoryStore = defineStore('repository', {
       }
       this.graph = await fetchGraph(this.taskId)
       this.framework = this.graph.framework
-      const first = this.graph.codeUnits[0]
-      if (first && !this.selectedUnitId) {
-        await this.selectUnit(first.id)
-      }
+      // T24：默认不铺全图、也不预选第一个类 —— 点击类才显示它的邻域与源码。
+      this.selectedUnitId = null
+      this.neighborhood = null
       void this.loadLearningPath()
       void this.loadProgress(this.graph.repositoryUrl)
       void this.loadNotes(this.graph.repositoryUrl)

@@ -122,6 +122,9 @@ function onLineClick(lineNumber: number, lineText: string) {
         <span class="line-text">{{ line || ' ' }}</span>
       </div>
     </div>
+    <p v-else-if="!sourceError && !selectedUnitId" class="source-loading">
+      点击左侧的类，查看它的源码
+    </p>
     <p v-else-if="!sourceError" class="source-loading">加载源码中…</p>
   </div>
 </template>

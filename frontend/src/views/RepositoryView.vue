@@ -10,6 +10,7 @@ import SourcePane from '../components/SourcePane.vue'
 import LearningPathPanel from '../components/LearningPathPanel.vue'
 import QuizPanel from '../components/QuizPanel.vue'
 import NotePanel from '../components/NotePanel.vue'
+import AchievementsPanel from '../components/AchievementsPanel.vue'
 
 const repository = useRepositoryStore()
 const {
@@ -27,7 +28,8 @@ const {
 } = storeToRefs(repository)
 
 const showFullGraph = ref(false)
-const listTab = ref<'classes' | 'path' | 'quiz'>('classes')
+// T24：右栏统一 Tab（图 / 路线 / 测验 / 笔记 / 成就）；默认不铺全图，点类才看邻域
+const rightTab = ref<'graph' | 'path' | 'quiz' | 'note' | 'achievement'>('graph')
 
 // F6：分享短链弹窗
 const shareDialogVisible = ref(false)
@@ -135,24 +137,14 @@ async function onSubmit() {
     <!-- 结果区 -->
     <div v-if="phase === 'done' && graph" class="result-layout">
       <div class="list-pane">
-        <el-tabs v-model="listTab" class="list-tabs">
-          <el-tab-pane label="类列表" name="classes">
-            <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
-            <ClassList
-              :units="graph.codeUnits"
-              :selected-id="selectedUnitId"
-              :filter-text="filterText"
-              :progress="repository.unitProgress"
-              @select="(id: string) => void repository.selectUnit(id)"
-            />
-          </el-tab-pane>
-          <el-tab-pane label="学习路线" name="path">
-            <LearningPathPanel />
-          </el-tab-pane>
-          <el-tab-pane label="测验" name="quiz">
-            <QuizPanel />
-          </el-tab-pane>
-        </el-tabs>
+        <el-input v-model="filterText" placeholder="过滤类名或包名" clearable size="small" />
+        <ClassList
+          :units="graph.codeUnits"
+          :selected-id="selectedUnitId"
+          :filter-text="filterText"
+          :progress="repository.unitProgress"
+          @select="(id: string) => void repository.selectUnit(id)"
+        />
       </div>
 
       <div class="source-pane">
@@ -162,21 +154,39 @@ async function onSubmit() {
         <QaPanel />
       </div>
 
-      <div class="graph-pane">
-        <div class="graph-header">
-          <span class="graph-title">
-            {{ showFullGraph ? '全图' : selectedUnit ? `依赖图：${selectedUnit.name}` : '依赖图' }}
-          </span>
-          <el-button size="small" @click="showFullGraph = !showFullGraph">
-            {{ showFullGraph ? '显示邻域' : '显示全图' }}
-          </el-button>
-        </div>
-        <DependencyGraphPane :mermaid-text="displayedMermaid" />
-        <p v-if="graph.isolatedCodeUnitIds.length > 0" class="isolated-hint">
-          另有 {{ graph.isolatedCodeUnitIds.length }} 个类没有依赖关系，未画进图
-        </p>
-        <!-- F5：右侧笔记面板（当前选中类） -->
-        <NotePanel />
+      <!-- T24：右栏统一 Tab —— 图 / 学习路线 / 测验 / 笔记 / 成就 -->
+      <div class="right-pane">
+        <el-tabs v-model="rightTab">
+          <el-tab-pane label="依赖图" name="graph">
+            <div class="graph-header">
+              <span class="graph-title">
+                {{ showFullGraph ? '全图' : selectedUnit ? `依赖图：${selectedUnit.name}` : '依赖图' }}
+              </span>
+              <el-button size="small" @click="showFullGraph = !showFullGraph">
+                {{ showFullGraph ? '显示邻域' : '显示全图' }}
+              </el-button>
+            </div>
+            <p v-if="!showFullGraph && !selectedUnit" class="graph-hint">
+              点击左侧的类，查看它与其它类的依赖关系
+            </p>
+            <DependencyGraphPane v-else :mermaid-text="displayedMermaid" />
+            <p v-if="graph.isolatedCodeUnitIds.length > 0" class="isolated-hint">
+              另有 {{ graph.isolatedCodeUnitIds.length }} 个类没有依赖关系，未画进图
+            </p>
+          </el-tab-pane>
+          <el-tab-pane label="学习路线" name="path">
+            <LearningPathPanel />
+          </el-tab-pane>
+          <el-tab-pane label="测验" name="quiz">
+            <QuizPanel />
+          </el-tab-pane>
+          <el-tab-pane label="笔记" name="note">
+            <NotePanel />
+          </el-tab-pane>
+          <el-tab-pane label="成就" name="achievement">
+            <AchievementsPanel />
+          </el-tab-pane>
+        </el-tabs>
       </div>
     </div>
   </el-card>
@@ -258,9 +268,16 @@ async function onSubmit() {
   min-width: 0;
 }
 
-.graph-pane {
+.right-pane {
   flex: 1 1 0;
   min-width: 0;
+}
+
+.graph-hint {
+  color: #909399;
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
 }
 
 .graph-header {
