@@ -1,10 +1,10 @@
 # 进度
 
 ## 当前任务
-T13 MySQL 持久化基础设施（F2/F6 阶段，需求来源 FEATURE_SPEC_F2_F6.md）
+T19 F5 进度 + 成就（待用户指令，T14～T18 已全部完成并提交）
 
 ## 已完成
-计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 252 + 集成 23 = 275，全绿**。
+计数口径为**本任务新增**，避免后续任务读到过期的累计值。当前合计：**单元 285 + 集成 26 = 311，全绿**。
 
 - T0 项目骨架（`d2e87f3`）：Java 21 + Spring Boot 4.1.1 后端（`/health`）+ Vue3 / Vite 8 / Pinia 4 / Element Plus / TS 前端，前后端经 Vite 代理连通。新增单元 10
 - T0 加固：Jackson 3 默认值实测契约（`JacksonThreeDefaultsTest`）、Element Plus 按需引入、前端 tsconfig 拆 app/node 双项目
@@ -180,3 +180,8 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 2026-09-18：新增根 `.gitignore`（`.idea/`、`docs/screenshots/`）——截图是演示产物不进版本库；此前无根级 .gitignore，靠 `git add -A` 提交时已小心避让
 - 2026-09-18：**T14 源码可见 + 选中标识符提问**：后端 `GET /{id}/source?unit=`（T7 内存快照的**单类切片**，非仓库转储 —— §07「不公开大段源码」的边界解读：整仓库倾倒禁止、单类按需取阅是 S7 引用验证的产品本职）；`AskRequest` 加 `anchorStartLine/anchorEndLine` 行锚点，AnswerService 把选中范围切成「【聚焦】片段」置顶进提示词（范围钳制在单元内、unitId 未知退化为普通检索）；**行锚点提问不走缓存**（行号参与语义，CacheKey 不含行号会错命中）。`UnitView` 增 methods/fields 供前端吸附。前端三栏布局（类列表 | 源码+问答 | 图），点源码行自动吸附到所在方法（字段按声明行匹配）。真实走查：点第 95 行 → 「方法 processFindForm（94-122 行）」→ DeepSeek 回答逐行引用方法内代码 ✓。新增单元 9（AnswerService 4 + 控制器 5）
 - T13（F2/F6 阶段）MySQL 持久化基础设施：Flyway 12（starter-flyway + flyway-mysql）V1 基线 9 表（规格 8 表 + cache_entries）、`spring.datasource.*` 走 DB_URL/DB_USER/DB_PASSWORD 环境变量（缺省回落 H2）、`MysqlCacheService`（JdbcTemplate + 注入 JsonMapper，默认启用；InMemoryCacheService 保留于 storage=memory）。**MyBatis-Plus 预研失败 → JPA 路线**。新增单元 7（FlywayMigrationTest 2 + MysqlCacheServiceTest 5）+ 集成 2（真 MySQL 双闸）
+- T14 F2 学习路线后端：`LearningPathService`（入口类置顶 + 入度降序 + 名字典序的**环安全**排序；LLM 一次调用只喂元数据写 reason、失败回退确定性描述并截 60 字）、`LearningPathEntity`（`@JdbcTypeCode(SqlTypes.JSON)` 规避 H2 JSON 坑）+ `LearningPathRepository`（`(repoUrl,commitSha)` 唯一即 F2 缓存）、`LearningPathController`（POST 幂等不重调 LLM / GET 未生成 404）。新增单元 15 + 集成 1（真机 petclinic 首步入库、覆盖全量、reason 非空、二次幂等）
+- T15 F2 学习路线前端：类列表加「学习路线」Tab（`LearningPathPanel`），生成/按 order 展示/点步跳转/预计时间/展开折叠。真机走查：25 步、首步 PetClinicApplication、点步跳转生效
+- T16 F4 自动测验后端：`QuizService`（只把选中类源码发 LLM，逐题校验 reference 落在选中类行区间、题型/选项/下标校验、cap 10）、`QuizEntity`/`QuizRepository`、`QuizController`（生成 + 判分）。answer 用 0-based 下标（规避 SCHEMA 示例「A」歧义）。新增单元 10 + 集成 1（真机 + 真实 DeepSeek：≥5 题、reference 全合法、判分正确率）
+- T17 F4 测验前端：类列表加「测验」Tab（`QuizPanel`），选中类生成/逐题作答/提交判分显示得分与错题解析/引用跳转。真机走查：10 题生成、判分显示得分
+- T18 F5 匿名身份 + 笔记：`ClientIdentityInterceptor`（cc_client_id Cookie，30 天 HttpOnly，无则生成 UUID + upsert anonymous_users）、`ClientIdentityHolder`（ThreadLocal 上下文，测试可注入）、`IdentityService`、`/api/me`（GET 身份/PUT 昵称）、`NoteController`（笔记 CRUD，绑定 clientId 且所有权校验）、`AnonymousUserEntity`/`NoteEntity` + 仓储。新增单元 8 + 集成 1（真 HTTP：Cookie 恢复身份、昵称、笔记持久化与隔离）
