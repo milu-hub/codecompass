@@ -14,4 +14,17 @@ import './styles/global.css'
 import 'element-plus/es/components/notification/style/css'
 import 'element-plus/es/components/message/style/css'
 
-createApp(App).use(createPinia()).mount('#app')
+const app = createApp(App)
+
+/**
+ * 组件出错时不要把整页搞白。
+ *
+ * 实测教训：Vue 默认会让渲染期异常一路冒泡，patch 在出错的那个组件处中断，
+ * 于是"顶栏还在、输入行和状态条全没了"——看起来像布局被删了，其实是渲染中断。
+ * 装上 errorHandler 后错误只影响出错的那棵子树，其余部分照常渲染，控制台里能看到原因。
+ */
+app.config.errorHandler = (error, _instance, info) => {
+  console.error('[CodeCompass] 组件出错（已隔离，不影响其它区域）：', info, error)
+}
+
+app.use(createPinia()).mount('#app')
