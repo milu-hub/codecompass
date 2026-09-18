@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -71,7 +72,22 @@ public class AnswerService {
 
     public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question,
                               String unitId, String clientKey) {
-        CacheKey cacheKey = cacheKeyFor(snapshot, question, unitId);
+        return askCore(snapshot, question, unitId, null, null, clientKey);
+    }
+
+    /**
+     * 行锚点版（T14 选中标识符提问）：把选中范围做成聚焦片段置顶进提示词。
+     * 行号参与语义，缓存 key 不含行号会错命中 —— 行锚点提问**不走缓存**。
+     */
+    public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question, String unitId,
+                              Integer anchorStartLine, Integer anchorEndLine, String clientKey) {
+        return askCore(snapshot, question, unitId, anchorStartLine, anchorEndLine, clientKey);
+    }
+
+    private AnswerResponse askCore(AnalysisTaskSnapshot snapshot, String question, String unitId,
+                                   Integer anchorStartLine, Integer anchorEndLine, String clientKey) {
+        CacheKey cacheKey = anchorStartLine == null
+                ? cacheKeyFor(snapshot, question, unitId) : null;
         if (cacheKey != null) {
             Optional<AnswerResponse> cached = cacheService.get(cacheKey);
             if (cached.isPresent()) {
@@ -79,8 +95,15 @@ public class AnswerService {
             }
         }
 
-        List<RetrievedSnippet> snippets = retriever.retrieve(
-                question, snapshot.outcome(), unitId);
+        List<RetrievedSnippet> snippets = new ArrayList<>(
+                retriever.retrieve(question, snapshot.outcome(), unitId));
+        focusedSnippet(snapshot.outcome(), unitId, anchorStartLine, anchorEndLine)
+                .ifPresent(focused -> {
+                    snippets.removeIf(s -> s.file().equals(focused.file())
+                            && s.startLine() == focused.startLine()
+                            && s.endLine() == focused.endLine());
+                    snippets.add(0, focused);
+                });
         if (snippets.isEmpty()) {
             // 问答必须基于检索片段：没检索到就明说，而不是把空上下文甩给 LLM
             return new AnswerResponse(NO_SNIPPETS_ANSWER, List.of(), properties.getModel());
@@ -107,6 +130,53 @@ public class AnswerService {
             userPrompt = buildPrompt(question, snippets, validation.invalid());
         }
         throw new IllegalStateException("不可达：重试循环必在 maxAttempts 处返回");
+    }
+
+    // ---------- T14：行锚点聚焦片段 ----------
+
+    /** 聚焦片段的分数标记：远高于检索权重，仅用于提示词排序与「聚焦」标注。 */
+    private static final double FOCUSED_SCORE = 100.0;
+
+    /**
+     * 把选中范围切成聚焦片段（钳制在单元范围内）。unitId 未知或范围非法时返回空，
+     * 调用方退化为普通检索 —— 行锚点是增强，不是硬前置。
+     */
+    private static Optional<RetrievedSnippet> focusedSnippet(AnalysisTaskSnapshot.AnalysisOutcome outcome,
+                                                             String unitId,
+                                                             Integer anchorStartLine,
+                                                             Integer anchorEndLine) {
+        if (anchorStartLine == null || anchorStartLine < 1
+                || outcome == null || outcome.result() == null || unitId == null) {
+            return Optional.empty();
+        }
+        CodeUnitInfo unit = outcome.result().codeUnits().stream()
+                .filter(u -> u.id().equals(unitId))
+                .findFirst()
+                .orElse(null);
+        if (unit == null) {
+            return Optional.empty();
+        }
+        int start = Math.max(unit.startLine(), Math.min(anchorStartLine, unit.endLine()));
+        int end = anchorEndLine == null || anchorEndLine < start
+                ? start
+                : Math.min(Math.max(anchorEndLine, start), unit.endLine());
+        String content = sliceLines(outcome.sourceLines(), unit.filePath(), start, end);
+        return Optional.of(new RetrievedSnippet(
+                unit.filePath(), unit.language(), start, end, content, FOCUSED_SCORE));
+    }
+
+    private static String sliceLines(Map<String, List<String>> sourceLines,
+                                     String file, int start, int end) {
+        List<String> lines = sourceLines == null ? null : sourceLines.get(file);
+        if (lines == null) {
+            return "";
+        }
+        int from = start - 1;
+        int to = Math.min(end, lines.size());
+        if (from < 0 || from >= to) {
+            return "";
+        }
+        return String.join("\n", lines.subList(from, to));
     }
 
     private int maxAttempts() {
@@ -163,7 +233,8 @@ public class AnswerService {
                 + "（每行开头冒号前的数字是该行在文件中的真实行号，引用时只能使用这些行号）：\n");
         int index = 0;
         for (RetrievedSnippet snippet : snippets) {
-            prompt.append("### 片段 ").append(index++).append("：")
+            String focus = snippet.score() >= FOCUSED_SCORE ? "【聚焦】" : "";
+            prompt.append("### ").append(focus).append("片段 ").append(index++).append("：")
                     .append(snippet.file()).append("（").append(snippet.language())
                     .append("，行 ").append(snippet.startLine())
                     .append("–").append(snippet.endLine()).append("）\n");

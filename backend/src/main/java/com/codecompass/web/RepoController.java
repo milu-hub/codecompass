@@ -1,5 +1,7 @@
 package com.codecompass.web;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.codecompass.analyzer.CodeUnitInfo;
 import com.codecompass.graph.DependencyGraph;
 import com.codecompass.graph.DependencyGraphBuilder;
 import com.codecompass.repo.GitRepositoryCloner;
@@ -27,6 +30,7 @@ import com.codecompass.web.dto.CreateRepoRequest;
 import com.codecompass.web.dto.ErrorResponse;
 import com.codecompass.web.dto.GraphResponse;
 import com.codecompass.web.dto.NotReadyResponse;
+import com.codecompass.web.dto.SourceView;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -108,10 +112,44 @@ public class RepoController {
     }
 
     /**
+     * T14：单个类的源码行（T7 内存快照的切片）。只给选中类的范围，不是仓库转储。
+     */
+    @GetMapping("/{taskId}/source")
+    public ResponseEntity<?> source(@PathVariable String taskId, @RequestParam String unit) {
+        AnalysisTaskSnapshot snapshot = store.find(taskId).orElse(null);
+        if (snapshot == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("任务不存在"));
+        }
+        if (!AnalysisTaskSnapshot.STATUS_DONE.equals(snapshot.status())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new NotReadyResponse(
+                    taskId, snapshot.status(), "分析尚未完成，当前状态：" + snapshot.status()));
+        }
+        CodeUnitInfo codeUnit = snapshot.outcome().result().codeUnits().stream()
+                .filter(u -> u.id().equals(unit))
+                .findFirst()
+                .orElse(null);
+        if (codeUnit == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("单元不存在：" + unit));
+        }
+        List<String> all = snapshot.outcome().sourceLines().get(codeUnit.filePath());
+        List<String> lines = new ArrayList<>();
+        if (all != null) {
+            int from = codeUnit.startLine() - 1;
+            int to = Math.min(codeUnit.endLine(), all.size());
+            if (from >= 0 && from < to) {
+                lines.addAll(all.subList(from, to));
+            }
+        }
+        return ResponseEntity.ok(new SourceView(codeUnit.filePath(), codeUnit.language(),
+                codeUnit.startLine(), codeUnit.endLine(), List.copyOf(lines)));
+    }
+
+    /**
      * T10 问答。答案只能基于 T9 的检索片段；LLM 报出的引用逐条与片段比对（AnswerService 内）。
      *
      * <p>状态语义：未知 404；未完成 409（failed 时携带 errorMessage）；
      * 超限 429（T11 每日 token 上限）；LLM 通道故障 502（answer 根本不存在，不降级 200）。
+     * T14：带 {@code anchorStartLine} 时按选中标识符的行锚点提问（不走缓存）。
      */
     @PostMapping("/{taskId}/ask")
     public ResponseEntity<?> ask(@PathVariable String taskId, @RequestBody AskRequest request,
@@ -135,8 +173,12 @@ public class RepoController {
                     .body(new NotReadyResponse(taskId, snapshot.status(), message));
         }
         try {
-            return ResponseEntity.ok(answerService.ask(
-                    snapshot, question, unitId, resolveClientKey(servletRequest)));
+            String clientKey = resolveClientKey(servletRequest);
+            if (request.anchorStartLine() != null) {
+                return ResponseEntity.ok(answerService.ask(snapshot, question, unitId,
+                        request.anchorStartLine(), request.anchorEndLine(), clientKey));
+            }
+            return ResponseEntity.ok(answerService.ask(snapshot, question, unitId, clientKey));
         } catch (RateLimitExceededException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(new ErrorResponse(e.getMessage()));

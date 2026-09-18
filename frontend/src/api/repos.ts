@@ -15,6 +15,21 @@ export interface UnitView {
   annotations: string[]
   startLine: number
   endLine: number
+  /** T14：选中标识符提问的原料 —— 点源码行时吸附到所在方法/字段 */
+  methods: MethodView[]
+  fields: FieldView[]
+}
+
+export interface MethodView {
+  name: string
+  signature: string
+  startLine: number
+  endLine: number
+}
+
+export interface FieldView {
+  name: string
+  type: string
 }
 
 export interface DependencyEdge {
@@ -66,6 +81,20 @@ export function fetchGraph(taskId: string, unitId?: string): Promise<GraphRespon
   return getJson<GraphResponse>(`/api/repos/${taskId}/graph${query}`)
 }
 
+// ---------- T14 源码与行锚点 ----------
+
+export interface SourceView {
+  file: string
+  language: string
+  startLine: number
+  endLine: number
+  lines: string[]
+}
+
+export function fetchSource(taskId: string, unitId: string): Promise<SourceView> {
+  return getJson<SourceView>(`/api/repos/${taskId}/source?unit=${encodeURIComponent(unitId)}`)
+}
+
 // ---------- T10 问答 ----------
 
 export interface AskReference {
@@ -81,7 +110,21 @@ export interface AskResponse {
   model: string
 }
 
-/** unitId 是 §S7「点击某个类提问」的锚点；null 时后端按关键词检索。 */
-export function askQuestion(taskId: string, question: string, unitId: string | null): Promise<AskResponse> {
-  return postJson<AskResponse>(`/api/repos/${taskId}/ask`, { question, unitId })
+/**
+ * unitId 是 §S7「点击某个类提问」的锚点；null 时后端按关键词检索。
+ * anchorStartLine/anchorEndLine 是 T14 选中标识符的行锚点（可空）。
+ */
+export function askQuestion(
+  taskId: string,
+  question: string,
+  unitId: string | null,
+  anchorStartLine?: number | null,
+  anchorEndLine?: number | null,
+): Promise<AskResponse> {
+  return postJson<AskResponse>(`/api/repos/${taskId}/ask`, {
+    question,
+    unitId,
+    anchorStartLine: anchorStartLine ?? null,
+    anchorEndLine: anchorEndLine ?? null,
+  })
 }

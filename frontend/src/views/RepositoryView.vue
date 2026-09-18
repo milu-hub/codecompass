@@ -5,6 +5,7 @@ import { useRepositoryStore } from '../stores/repository'
 import ClassList from '../components/ClassList.vue'
 import DependencyGraphPane from '../components/DependencyGraphPane.vue'
 import QaPanel from '../components/QaPanel.vue'
+import SourcePane from '../components/SourcePane.vue'
 
 const repository = useRepositoryStore()
 const {
@@ -99,6 +100,13 @@ async function onSubmit() {
         />
       </div>
 
+      <div class="source-pane">
+        <!-- T14：选中类源码（点行选中标识符） -->
+        <SourcePane />
+        <!-- F3：AI 问答（点类提问 + 选中标识符行锚点） -->
+        <QaPanel />
+      </div>
+
       <div class="graph-pane">
         <div class="graph-header">
           <span class="graph-title">
@@ -112,8 +120,6 @@ async function onSubmit() {
         <p v-if="graph.isolatedCodeUnitIds.length > 0" class="isolated-hint">
           另有 {{ graph.isolatedCodeUnitIds.length }} 个类没有依赖关系，未画进图
         </p>
-        <!-- F3：AI 问答（后端 T10 /ask，点类提问带锚点） -->
-        <QaPanel />
       </div>
     </div>
   </el-card>
@@ -152,17 +158,23 @@ async function onSubmit() {
   display: flex;
   gap: 16px;
   margin-top: 16px;
+  align-items: flex-start;
 }
 
 .list-pane {
-  width: 380px;
+  width: 280px;
   flex-shrink: 0;
   border-right: 1px solid #ebeef5;
   padding-right: 12px;
 }
 
+.source-pane {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .graph-pane {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
 }
 

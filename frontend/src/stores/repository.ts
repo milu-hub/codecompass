@@ -4,6 +4,14 @@ import type { AnalysisTaskView, GraphResponse } from '../api/repos'
 
 export type TaskPhase = 'idle' | 'submitting' | 'pending' | 'running' | 'done' | 'failed'
 
+/** T14：源码里选中的标识符范围（提问的行锚点）。 */
+export interface SourceSelection {
+  startLine: number
+  endLine: number
+  /** 给人看的描述，如「方法 processFindForm（94-122 行）」 */
+  label: string
+}
+
 /**
  * T8 的状态机中心。
  *
@@ -25,6 +33,7 @@ export const useRepositoryStore = defineStore('repository', {
     neighborhood: null as GraphResponse | null,
     selectedUnitId: null as string | null,
     filterText: '',
+    selection: null as SourceSelection | null,
     pollingHandle: null as number | null,
     // 点击类的请求竞态令牌：晚到的旧响应必须丢弃
     unitRequestToken: 0,
@@ -112,11 +121,20 @@ export const useRepositoryStore = defineStore('repository', {
         return
       }
       this.selectedUnitId = unitId
+      this.selection = null   // 换类后旧选中范围不再有意义
       const token = ++this.unitRequestToken
       const response = await fetchGraph(this.taskId, unitId)
       if (token === this.unitRequestToken) {
         this.neighborhood = response
       }
+    },
+
+    setSelection(selection: SourceSelection) {
+      this.selection = selection
+    },
+
+    clearSelection() {
+      this.selection = null
     },
   },
 })

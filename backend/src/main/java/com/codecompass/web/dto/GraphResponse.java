@@ -56,7 +56,15 @@ public record GraphResponse(
         return outcome.result().codeUnits().stream()
                 .map(unit -> new UnitView(unit.id(), unit.filePath(), unit.packageName(),
                         unit.name(), unit.kind(), outcome.roles().getOrDefault(unit.id(), ""),
-                        unit.annotations(), unit.startLine(), unit.endLine()))
+                        unit.annotations(), unit.startLine(), unit.endLine(),
+                        outcome.result().methods().stream()
+                                .filter(method -> method.codeUnitId().equals(unit.id()))
+                                .map(method -> new UnitView.MethodView(method.name(), method.signature(),
+                                        method.startLine(), method.endLine()))
+                                .toList(),
+                        unit.fields().stream()
+                                .map(field -> new UnitView.FieldView(field.name(), field.type()))
+                                .toList()))
                 .toList();
     }
 }

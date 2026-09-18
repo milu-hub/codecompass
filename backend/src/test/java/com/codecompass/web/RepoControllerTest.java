@@ -401,6 +401,72 @@ class RepoControllerTest {
         return taskId;
     }
 
+    // ---------- GET /api/repos/{id}/source + ask 行锚点 ----------
+
+    @Test
+    @DisplayName("source 未知任务：404")
+    void sourceOfUnknownTaskReturns404() throws Exception {
+        mockMvc.perform(get("/api/repos/no-such-task/source").param("unit", "x"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("任务不存在"));
+    }
+
+    @Test
+    @DisplayName("source 未完成（running）：409")
+    void sourceWhileRunningReturns409() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withProgress(
+                AnalysisTaskSnapshot.STATUS_RUNNING, 60, "解析源码"));
+
+        mockMvc.perform(get("/api/repos/" + taskId + "/source").param("unit", "x"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("source done：200 + file/language/行区间/源码行")
+    void sourceWhenDoneReturnsLines() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+
+        mockMvc.perform(get("/api/repos/" + taskId + "/source").param("unit", "repo:u"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.file").value("src/main/java/OwnerController.java"))
+                .andExpect(jsonPath("$.language").value("java"))
+                .andExpect(jsonPath("$.startLine").value(1))
+                .andExpect(jsonPath("$.endLine").value(9))
+                .andExpect(jsonPath("$.lines[0]").value("class OwnerController"));
+    }
+
+    @Test
+    @DisplayName("source 未知单元：404")
+    void sourceUnknownUnitReturns404() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+
+        mockMvc.perform(get("/api/repos/" + taskId + "/source").param("unit", "ghost"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("单元")));
+    }
+
+    @Test
+    @DisplayName("ask 带行锚点：200，行号透传给问答服务")
+    void askWithAnchorLinesReturnsAnswer() throws Exception {
+        String taskId = store.create("https://github.com/a/b");
+        store.update(taskId, snapshot -> snapshot.withDone(doneOutcome(), "java", "分析完成"));
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"选中方法的解释\",\"references\":[{\"file\":"
+                        + "\"src/main/java/OwnerController.java\",\"language\":\"java\","
+                        + "\"startLine\":1,\"endLine\":9}]}");
+
+        mockMvc.perform(post("/api/repos/" + taskId + "/ask")
+                        .contentType("application/json")
+                        .content("{\"question\": \"这个方法做什么\", \"unitId\": \"repo:u\","
+                                + "\"anchorStartLine\": 1, \"anchorEndLine\": 9}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer").value("选中方法的解释"))
+                .andExpect(jsonPath("$.references[0].startLine").value(1));
+    }
+
     // ---------- helpers ----------
 
     /**

@@ -269,6 +269,67 @@ class AnswerServiceTest {
                 .isPositive();
     }
 
+    // ---------- 行锚点（选中标识符提问） ----------
+
+    @Test
+    @DisplayName("行锚点：聚焦片段置顶进提示词，范围内的引用通过校验")
+    void lineAnchoredAskPrependsFocusedSnippet() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"A\",\"references\":[{\"file\":\"" + OWNER_FILE
+                        + "\",\"language\":\"java\",\"startLine\":12,\"endLine\":14}]}");
+        ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+
+        AnswerResponse response = service.ask(doneSnapshot(), "这段代码在做什么",
+                "u-oc", 10, 20, "test-client");
+
+        assertThat(response.references())
+                .containsExactly(new AnswerResponse.Reference(OWNER_FILE, "java", 12, 14));
+        verify(llmClient).complete(anyString(), prompt.capture());
+        assertThat(prompt.getValue())
+                .as("提示词必须包含聚焦片段（真实行号前缀）")
+                .contains("10 | L10")
+                .contains("20 | L20")
+                .contains("聚焦");
+    }
+
+    @Test
+    @DisplayName("行锚点范围被钳制在单元范围内（越界不越出类）")
+    void lineAnchorIsClampedToUnitRange() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn("{\"answer\":\"A\",\"references\":[]}");
+        ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+
+        service.ask(doneSnapshot(), "这段代码在做什么", "u-oc", 10, 200, "test-client");
+
+        verify(llmClient).complete(anyString(), prompt.capture());
+        assertThat(prompt.getValue())
+                .contains("40 | L40")
+                .doesNotContain("41 |");
+    }
+
+    @Test
+    @DisplayName("行锚点提问不缓存：同样的问题两次都触达 LLM（行号参与语义，键不含行号会错命中）")
+    void lineAnchoredAskSkipsCache() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"A\",\"references\":[{\"file\":\"" + OWNER_FILE
+                        + "\",\"language\":\"java\",\"startLine\":12,\"endLine\":14}]}");
+
+        service.ask(doneSnapshotWithSha("abc123"), "这段代码在做什么", "u-oc", 10, 20, "test-client");
+        service.ask(doneSnapshotWithSha("abc123"), "这段代码在做什么", "u-oc", 10, 20, "test-client");
+
+        verify(llmClient, times(2)).complete(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("行锚点但 unitId 未知：退化为普通检索，不抛异常")
+    void lineAnchorWithUnknownUnitFallsBack() {
+        Mockito.when(llmClient.complete(anyString(), anyString())).thenReturn("{\"answer\":\"A\",\"references\":[]}");
+
+        AnswerResponse response = service.ask(doneSnapshot(), "OwnerController",
+                "ghost-unit", 10, 20, "test-client");
+
+        assertThat(response.answer()).isEqualTo("A");
+    }
+
     // ---------- 夹具 ----------
 
     private static List<String> numberedLines(int count) {
