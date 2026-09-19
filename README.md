@@ -22,13 +22,9 @@
 
 ## 截图
 
-| 首页 | LLM 设置 |
+| 首页 | 源码解析 |
 |---|---|
-| ![首页](assets/show_1.png) | ![LLM 设置](assets/show_2.png) |
-
-| 新建 LLM 配置 | 源码解析 |
-|---|---|
-| ![新建 LLM 配置](assets/show_3.png) | ![源码解析](assets/show_4.png) |
+| ![首页](assets/show_1.png) | ![源码解析](assets/show_4.png) |
 
 | 依赖图 | 分享页 |
 |---|---|
