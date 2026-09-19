@@ -29,6 +29,7 @@ public class QuizService {
 
     private static final int MIN_QUESTIONS = 5;
     private static final int MAX_QUESTIONS = 10;
+    private static final int MAX_SELECTED_CLASSES = 5;
 
     private static final String SYSTEM_PROMPT = """
             你是代码讲解助手，根据给定的源码生成测验题。
@@ -73,6 +74,10 @@ public class QuizService {
     public Quiz generate(AnalyzeResult result, Map<String, List<String>> sourceLines,
                          String repoUrl, String commitSha, List<String> selectedUnitIds,
                          LlmConfig requestConfig) {
+        // 规格（FEATURE_SPEC_F2_F6.md）：至少 1 个、最多 5 个选中类。
+        if (selectedUnitIds != null && selectedUnitIds.size() > MAX_SELECTED_CLASSES) {
+            throw new IllegalArgumentException("最多选择 " + MAX_SELECTED_CLASSES + " 个类");
+        }
         List<CodeUnitInfo> selected = result.codeUnits().stream()
                 .filter(unit -> selectedUnitIds != null && selectedUnitIds.contains(unit.id()))
                 .toList();

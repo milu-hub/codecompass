@@ -113,6 +113,15 @@ class QuizServiceTest {
     }
 
     @Test
+    @DisplayName("选中超过 5 个类 → 抛 IllegalArgumentException（规格：至少 1 个、最多 5 个）")
+    void selectionExceedingFiveThrows() {
+        assertThatThrownBy(() -> service.generate(result(), sourceLines(), "r", "sha",
+                List.of("u-a", "u-b", "u-c", "u-d", "u-e", "u-f")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("最多");
+    }
+
+    @Test
     @DisplayName("带 requestConfig 时用请求配置构造客户端（factory 收到该配置）")
     void generateUsesRequestConfigWhenProvided() {
         LlmConfig[] captured = new LlmConfig[1];
