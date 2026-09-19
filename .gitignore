@@ -3,3 +3,8 @@
 
 # 运行演示截图（临时产物，不进版本库）
 docs/screenshots/
+
+# 本地环境变量（真实 key / 数据库凭据绝不进版本库；示例文件除外）
+.env
+.env.*
+!.env.example
