@@ -50,6 +50,11 @@ Python 解析器（P1–P8）与前端收尾（Python 高亮档案 P6 + 分享�
 mvn -f backend/pom.xml clean package
 java -jar backend/target/codecompass-backend-0.0.1-SNAPSHOT.jar
 
+# 不连数据库裸跑：DB_URL / DB_USER / DB_PASSWORD 三个都不设即可 ——
+# 缺省数据源是内存 H2（MODE=MySQL），Flyway 启动时自动建表，进程退出数据即消失。
+# 下面这个脚本会检查产物 + 真的启动一次（/health、/api/me 落库回读）：
+powershell -ExecutionPolicy Bypass -File backend/scripts/verify-standalone-jar.ps1 -Build
+
 # 前端 :5173（Windows 上 npm.ps1 被执行策略拦截，必须走 cmd /c 或 npm.cmd）
 cd frontend && cmd /c "npm install" && cmd /c "npm run dev"
 
@@ -98,6 +103,11 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
   预检（超过 `MAX_RENDERABLE_EDGES = 1000` 直接跳过并给降级说明）+ mermaid 的边数报错也映射到同一文案。
   **遗留的产品限制**：边数 > 1000 的仓库看不了全图（只能点类看一跳邻域）。若将来要支持，正解是
   **换展示粒度**（按包聚合的全图），而不是继续抬高阈值 —— 上千条边的类级图本来也读不了。
+
+- **可执行 jar 不含前端产物**：`java -jar` 只起后端 API（`BOOT-INF/classes/static` 为空，
+  实测 0 个条目）。要看到界面必须另外起 `:5173` 的 Vite dev server（它代理 `/api` 与 `/share`）。
+  把前端打进 jar 是另一件事：要处理构建顺序（Vite 产物先于 repackage 落到 static）、
+  SPA history 回退、以及 `/share/{id}` 这条后端渲染路由与前端路由的归属划分，尚未做。
 
 ## 决策记录
 - 2026-09-17：确定 MVP 边界，产品目标多语言，首发 Java 解析器
@@ -253,3 +263,19 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
   **真机验证**：① 600 边合成图 —— 默认配置 FAIL、设 `maxEdges` 后 OK（证明 500 上限确实是当初的原因）；
   ② 用 CDP 拦截真实 graph 响应、把全图换成 1200 边 → 界面显示「图太大，已跳过渲染」且**不再出现「依赖图渲染失败」**；
   ③ 回归：flask 真实 148 边全图仍照常出图（92 节点/148 边）
+- **裸跑 `java -jar`（不连数据库）修复（用户问「能否不连数据库跑通」，实测不能 → 修）**：
+  根因在 `backend/pom.xml` —— `com.h2database:h2` 写成了 `<scope>test</scope>`。缺省数据源正是 H2，
+  而 **test 作用域的依赖不会进 `spring-boot:repackage` 的可执行 jar**（实测 `BOOT-INF/lib` 71 个依赖里
+  有 `mysql-connector-j`、没有 `h2-*.jar`），于是裸跑必然
+  `Failed to load driver class org.h2.Driver` → `ClassNotFoundException` → 退出码 1。
+  **这个 bug 单元测试一辈子看不见**：Maven 的测试类路径包含 test 依赖，391 个测试全绿而产物是坏的 ——
+  所以修法之外必须补一个**看产物**的验证。改 `runtime`（runtime 同时进测试类路径，测试不受影响）。
+  新增 `backend/scripts/verify-standalone-jar.ps1`：L1 查 jar 内是否有 H2 驱动（离线秒级）；
+  L2 清空 `DB_*` 后真的启动、`/health` 200、日志含 `jdbc:h2:mem` 与 Flyway 迁移记录；
+  L3 打 `GET /api/me` 触发匿名身份落库回读（只有表建好、JPA 真能读写才会 200）。
+  **实测（修后）**：`BOOT-INF/lib` 72 个依赖含 `h2-2.4.240.jar`；裸跑 5.9s 启动，
+  真机分析 `spring-petclinic` → 25 单元 / 21 边 / 0 失败文件，写笔记并回读成功，成就列表正常。
+  **RED→GREEN 证据**：改前同一脚本 L1 报「没有 H2 驱动」、L2 报进程提前退出（就是上面那条堆栈）；改后全绿。
+  脚本走纯 ASCII + PowerShell 5.1（本机没有 pwsh 7，且 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
+  非 ASCII 会变成语法错误；执行策略也要 `-ExecutionPolicy Bypass`）。
+  **未做（用户未要求）**：把前端产物打进 jar，见「已知风险」最后一条。

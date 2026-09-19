@@ -83,11 +83,15 @@
       <scope>runtime</scope>
     </dependency>
 
-    <!-- 单元测试数据库：H2 的 MySQL 兼容模式，同一套 Flyway 脚本双通 -->
+    <!-- 缺省数据源：H2 的 MySQL 兼容模式，同一套 Flyway 脚本双通。
+         必须是 runtime 而不是 test —— 写成 test 时单元测试照样全绿（Maven 的测试类路径
+         包含 test 依赖），但 repackage 出来的可执行 jar 里没有 h2-*.jar，裸跑 java -jar
+         会直接 Failed to load driver class org.h2.Driver 退出。
+         回归守卫：backend/scripts/verify-standalone-jar.ps1（查产物 + 真的启动一次）。 -->
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
-      <scope>test</scope>
+      <scope>runtime</scope>
     </dependency>
 
     <!-- MyBatis-Plus 预研结论（2026-09-18）：3.5.12 的自动配置走 spring.factories，
