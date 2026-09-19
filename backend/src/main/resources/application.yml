@@ -175,6 +175,10 @@ codecompass:
     model: gpt-4o-mini
     timeout: 60s
     max-attempts: 3
+    # SSRF：默认不允许 LLM 端点解析到私有网段 / 环回 / link-local。
+    # 用本机 Ollama 或局域网 LLM 时打开（这是合法用法，堵死会误伤）。
+    # 云元数据网段 169.254.0.0/16 始终拒绝，不受本开关影响。
+    allow-private-network: false
 
   # T11：问答缓存与限流。T13 起缓存默认落 MySQL（MysqlCacheService，见 SCHEMA_F2_F6.md
   # 的 cache_entries）；storage=memory 切回内存版。缓存只存问答结果，不存仓库代码。

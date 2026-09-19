@@ -79,6 +79,20 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 ## 阻塞项
 （空）
 
+## 已知风险
+
+- **LLM 出站 SSRF（用户自填 key 能力固有）**：`/ask` 与 `/api/llm/test` 都会按**用户提供的
+  `baseUrl`** 发起服务端出站请求。已做部分缓解：`LlmEndpointGuard` 解析后判网段 —— 私有 /
+  环回 / 链路本地**默认拒绝**，可由 `codecompass.llm.allow-private-network` 放开（本地 Ollama
+  与局域网 LLM 是合法用法，堵死会误伤）；云元数据 `169.254.0.0/16` **硬拒且不可配置**。
+  另由 `NoRedirectRequestFactory` 禁止跟随重定向（防 302 把出站请求引到内网）。
+  **仍未覆盖（本轮明确不做）**：
+  - **DNS rebinding 防护**：guard 的解析与真正连接之间存在 TOCTOU 窗口 —— 攻击者可用短 TTL /
+    双应答 DNS 让校验时解析到公网、连接时落到内网。彻底修复需把「校验过的 IP」钉到连接层
+    （自定义解析器或连接时复验 IP），成本较高，留待后续。
+  - **只允许 https**：会挡住本地 Ollama 与局域网 LLM，明确不采纳。
+  - **provider 域名白名单**：维护成本高且会挡住自建反代，明确不采纳。
+
 ## 决策记录
 - 2026-09-17：确定 MVP 边界，产品目标多语言，首发 Java 解析器
 - 2026-09-17：本机 Redis 被 Device Guard 阻止，MVP 改用内存缓存
@@ -220,3 +234,5 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - T23 端到端验收：**327 全绿**（单元 299 + 集成 28，含真机克隆 3 样本 + 真 MySQL + 真实 DeepSeek），`docs/T23-验收报告.md` 逐项映射证据。本轮修 2 类**双方言测试断言**：① JSON 列回环改「解析后 JSON 树相等」（MySQL 会规范化 JSON 格式，字节比较只在 H2 成立）；② 仓储测试改 @Transactional + 每轮唯一键（真 MySQL 不随测试重建，固定键会被上轮残留挡住）
 - T24 UI 统一修正：`MermaidRenderer` 按角色输出 classDef/class（entry 橙 / controller 蓝 / service 绿 / entity 灰 / mapper 紫 / repository 青，顺序与节点顺序固定保证确定性）；core-annotations 加 entity/mapper 两个非 Spring 角色 + `role-only-annotations` 配置（把它们从「未进 framework-markers」漂移告警里排除，避免纯 JPA 仓库被误判成 Spring）；前端三栏（左类列表+进度 / 中源码+问答 / 右 Tab：依赖图·学习路线·测验·笔记·成就），**默认不铺全图也不预选类**，点类才出邻域。真机走查：默认提示、点类出邻域、五 Tab、问答 12 条引用全通。新增单元 5
 - T24 增量（用户要求）：**分享页加入本人笔记** —— 笔记没有别的"另存"途径，分享是唯一出口。`ShareSnapshot` 增 `notes[]`（类名+内容+更新时间，紧凑构造器对旧快照缺字段规范化空列表），`ShareService` 按 **clientId 过滤只取分享者本人**笔记（按更新时间倒序），`ShareController` 增「笔记」段落（HTML 转义/空态）。真机走查：写笔记 → 生成分享 → 无 Cookie 打开页面含笔记正文 ✓。新增单元 2
+- 用户自填 API Key（设置抽屉，分 5 步）：key **只存浏览器 localStorage**（`cc_llm_config`），服务端不持久化；问答按请求用 `X-LLM-Api-Key` / `X-LLM-Base-Url` / `X-LLM-Model` 请求头携带，优先级 **请求头 > 服务端环境变量 > 未配置（502）**。后端为「按请求解析配置」新增 `LlmClientFactory`（`AnswerService` 从持有单例客户端改为按请求造临时客户端、用完即弃）；前端纯逻辑下沉 `utils/llmConfig.ts`，保持 `api/` 层不依赖 Vue。`POST /api/llm/test` 测试连接统一回 `{ok,message}`（key 不进响应、不进日志、不进 URL）
+- **SSRF 决策（用户拍板）**：**采纳**「解析域名后拒绝私有网段 / 环回 / link-local」—— 默认拒绝是安全基线，`codecompass.llm.allow-private-network` 可放开（本地 Ollama / 局域网 LLM 是合法用法），云元数据 `169.254.0.0/16` 硬拒不可配；**额外要求**已落地：禁止跟随重定向（`NoRedirectRequestFactory` 显式 `setInstanceFollowRedirects(false)`，防 302 跳内网）、每次出站前记一行 `host + model`（不记完整 URL、不记 key）。**不采纳**「只允许 https」（挡住本地 Ollama / 局域网 LLM）与「provider 域名白名单」（维护成本高且挡住自建反代）。**DNS rebinding 防护留待后续**，已记入「已知风险」

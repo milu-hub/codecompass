@@ -31,13 +31,33 @@ class OpenAiCompatibleLlmClientTest {
     private final AtomicReference<String> capturedAuth = new AtomicReference<>();
     private final AtomicReference<String> scriptedResponse = new AtomicReference<>("{}");
     private final AtomicInteger scriptedStatus = new AtomicInteger(200);
+    /** 置非空则主端点回 302 + 该 Location（用来验证重定向不被跟随）。 */
+    private final AtomicReference<String> scriptedLocation = new AtomicReference<>();
+    /** 重定向目标被真正请求到的次数 —— 正确实现下应恒为 0。 */
+    private final AtomicInteger redirectTargetHit = new AtomicInteger();
 
     @BeforeEach
     void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/redirected", exchange -> {
+            redirectTargetHit.incrementAndGet();
+            byte[] bytes = "{\"choices\":[{\"message\":{\"content\":\"不该到这里\"}}]}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+        });
         server.createContext("/v1/chat/completions", exchange -> {
             capturedBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             capturedAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            String location = scriptedLocation.get();
+            if (location != null) {
+                exchange.getResponseHeaders().set("Location", location);
+                exchange.sendResponseHeaders(302, -1);
+                exchange.close();
+                return;
+            }
             byte[] bytes = scriptedResponse.get().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(scriptedStatus.get(), bytes.length);
@@ -53,10 +73,15 @@ class OpenAiCompatibleLlmClientTest {
         server.stop(0);
     }
 
+    /** 与生产同一套传输层（NoRedirectRequestFactory）+ 放开私有网段（本地 HttpServer 就在 127.0.0.1）。 */
+    private static RestClient restClient() {
+        return RestClient.builder().requestFactory(new NoRedirectRequestFactory()).build();
+    }
+
     private OpenAiCompatibleLlmClient configuredClient() {
         LlmConfig config = new LlmConfig("default", "deepseek", baseUrl, "sk-test-123", "deepseek-chat", true);
         return new OpenAiCompatibleLlmClient(
-                JsonMapper.builder().build(), RestClient.builder().build(), config);
+                JsonMapper.builder().build(), restClient(), config, new LlmEndpointGuard(true));
     }
 
     @Test
@@ -65,7 +90,7 @@ class OpenAiCompatibleLlmClientTest {
         LlmConfig config = new LlmConfig("default", "openai", baseUrl, "", "gpt-4o-mini", true);
 
         assertThatThrownBy(() -> new OpenAiCompatibleLlmClient(
-                JsonMapper.builder().build(), RestClient.builder().build(), config)
+                JsonMapper.builder().build(), restClient(), config, new LlmEndpointGuard(true))
                 .complete("system", "user"))
                 .isInstanceOf(LlmException.class)
                 .hasMessageContaining("未配置");
@@ -97,5 +122,31 @@ class OpenAiCompatibleLlmClientTest {
                 .isInstanceOf(LlmException.class)
                 .hasMessageContaining("LLM 调用失败")
                 .hasMessageContaining("500");
+    }
+
+    @Test
+    @DisplayName("302 重定向不被跟随：跳转目标一次都不会被请求")
+    void doesNotFollowRedirects() {
+        scriptedLocation.set("http://127.0.0.1:" + server.getAddress().getPort() + "/v1/redirected");
+
+        assertThatThrownBy(() -> configuredClient().complete("s", "u"))
+                .isInstanceOf(LlmException.class);
+
+        assertThat(redirectTargetHit.get())
+                .as("跟随重定向会把出站请求引到内网（302 是绕过出站校验的经典手法）")
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("SSRF 守卫拦在传输层之前：私有地址直接拒绝，请求根本不发出")
+    void guardBlocksPrivateEndpointBeforeAnyRequest() {
+        LlmConfig config = new LlmConfig("custom", "custom",
+                "http://10.0.0.5:8000/v1", "sk-test-123", "some-model", false);
+
+        assertThatThrownBy(() -> new OpenAiCompatibleLlmClient(
+                JsonMapper.builder().build(), restClient(), config, new LlmEndpointGuard(false))
+                .complete("s", "u"))
+                .isInstanceOf(LlmException.class)
+                .hasMessageContaining("私有/环回/链路本地");
     }
 }

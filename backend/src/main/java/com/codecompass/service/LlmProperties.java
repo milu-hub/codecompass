@@ -26,6 +26,16 @@ public class LlmProperties {
     /** 引用校验失败时的重试次数上限（含首次，共 maxAttempts 次调用）。 */
     private int maxAttempts = 3;
 
+    /**
+     * 是否允许 LLM 端点解析到私有网段 / 环回 / link-local。
+     *
+     * <p>默认 {@code false}（拒绝）：防止把 baseUrl 指向内网服务（SSRF）。本地 Ollama、
+     * 局域网 LLM 是合法用法，需要时打开本开关即可。
+     *
+     * <p>注意：云元数据网段 {@code 169.254.0.0/16} 不受本开关影响，<b>始终拒绝</b>。
+     */
+    private boolean allowPrivateNetwork = false;
+
     public String getProvider() {
         return provider;
     }
@@ -72,6 +82,14 @@ public class LlmProperties {
 
     public void setMaxAttempts(int maxAttempts) {
         this.maxAttempts = maxAttempts;
+    }
+
+    public boolean isAllowPrivateNetwork() {
+        return allowPrivateNetwork;
+    }
+
+    public void setAllowPrivateNetwork(boolean allowPrivateNetwork) {
+        this.allowPrivateNetwork = allowPrivateNetwork;
     }
 
     public boolean configured() {
