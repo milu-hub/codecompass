@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -63,7 +64,7 @@ public class GitRepositoryCloner {
 
         Path jobDir;
         try {
-            jobDir = workspaces.create(workspaceIdFor(repositoryUrl));
+            jobDir = workspaces.create(uniqueWorkspaceIdFor(repositoryUrl));
         } catch (RuntimeException e) {
             return CloneResult.fail("准备工作区失败：" + e.getMessage());
         }
@@ -201,6 +202,18 @@ public class GitRepositoryCloner {
             safeName = "repo";
         }
         return safeName + "-" + Integer.toHexString(normalized.hashCode());
+    }
+
+    /**
+     * 本次克隆实际使用的工作区 id：{@link #workspaceIdFor} 加一个随机后缀。
+     *
+     * <p>{@link #workspaceIdFor} 对同一 URL 是稳定的（可读、可追溯），但若直接拿它当目录名，
+     * 并发分析同一仓库会撞到同一个工作区目录 —— {@link TempWorkspaceManager#create} 先删后建，
+     * 一方删掉另一方正在用的目录，另一方报「删除工作区失败」。所以每次克隆都追加随机后缀，
+     * 让并发任务各用各的目录；分析结束由编排器统一清理，不依赖目录名复用。
+     */
+    String uniqueWorkspaceIdFor(String repositoryUrl) {
+        return workspaceIdFor(repositoryUrl) + "-" + UUID.randomUUID();
     }
 
     /** 去掉末尾斜杠与 .git 后缀，使同一仓库的不同写法得到同一个 id。 */

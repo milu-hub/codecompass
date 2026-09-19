@@ -139,6 +139,18 @@ class GitRepositoryClonerTest {
         assertThat(cloner.workspaceIdFor(url + ".git")).isEqualTo(cloner.workspaceIdFor(url));
     }
 
+    @Test
+    @DisplayName("每次克隆的工作区 id 唯一：并发分析同一仓库不会互删工作区")
+    void cloneWorkspaceIdIsUniquePerInvocation() {
+        GitRepositoryCloner cloner = cloner("git");
+
+        String a = cloner.uniqueWorkspaceIdFor("https://github.com/a/b");
+        String b = cloner.uniqueWorkspaceIdFor("https://github.com/a/b");
+
+        assertThat(a).isNotEqualTo(b);
+        assertThat(a).startsWith(cloner.workspaceIdFor("https://github.com/a/b"));
+    }
+
     // ---------- 命令拼装与受控环境 ----------
 
     @Test
