@@ -413,4 +413,37 @@ class AnswerServiceTest {
         svc.ask(doneSnapshot(), "OwnerController", null, "test-client");
         assertThat(captured.get()).isEqualTo(serverDefault);
     }
+
+    @Test
+    @DisplayName("用户自带模型：响应 model 与缓存 key 都跟随本次请求，而不是服务端默认")
+    void requestModelFlowsIntoResponseAndCacheKey() {
+        LlmClient mockClient = Mockito.mock(LlmClient.class);
+        Mockito.when(mockClient.complete(anyString(), anyString())).thenReturn(
+                "{\"answer\":\"A\",\"references\":[{\"file\":\"" + OWNER_FILE
+                        + "\",\"language\":\"java\",\"startLine\":1,\"endLine\":9}]}");
+
+        LlmConfig serverDefault = new LlmConfig("default", "openai",
+                "https://api.openai.com/v1", "server-key", "server-model", true);
+        AnswerService svc = new AnswerService(
+                new LexicalCodeRetriever(new RetrieveProperties()),
+                config -> mockClient, serverDefault,
+                new LlmProperties(), JsonMapper.builder().build(),
+                cacheService, rateLimiter);
+
+        LlmConfig requestConfig = new LlmConfig("request", "custom",
+                "https://api.deepseek.com/v1", "user-key", "user-model", false);
+
+        // 第一次：走服务端默认模型
+        AnswerResponse first = svc.ask(doneSnapshotWithSha("sha-model"), "OwnerController",
+                "u-oc", "test-client");
+        assertThat(first.model()).isEqualTo("server-model");
+
+        // 第二次：同快照同问题，但用户自带「另一个模型」
+        AnswerResponse second = svc.ask(doneSnapshotWithSha("sha-model"), "OwnerController",
+                "u-oc", "test-client", requestConfig);
+        assertThat(second.model())
+                .as("响应里的 model 必须是本次请求生效的模型，否则界面会显示错的模型名")
+                .isEqualTo("user-model");
+        verify(mockClient, times(2)).complete(anyString(), anyString());
+    }
 }

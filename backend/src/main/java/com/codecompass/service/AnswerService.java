@@ -114,8 +114,13 @@ public class AnswerService {
     private AnswerResponse askCore(AnalysisTaskSnapshot snapshot, String question, String unitId,
                                    Integer anchorStartLine, Integer anchorEndLine, String clientKey,
                                    LlmConfig requestConfig) {
+        // 本次请求生效的配置：请求头 > 服务端默认。
+        // 缓存 key 与响应 model 都必须按它来 —— 否则用户自带模型会命中服务端模型的缓存
+        // （拿到别的模型答的答案、且自己那个模型根本没被调用），响应里也会报错模型名。
+        LlmConfig effective = requestConfig != null && requestConfig.configured()
+                ? requestConfig : serverDefaultConfig;
         CacheKey cacheKey = anchorStartLine == null
-                ? cacheKeyFor(snapshot, question, unitId) : null;
+                ? cacheKeyFor(snapshot, question, unitId, effective.model()) : null;
         if (cacheKey != null) {
             Optional<AnswerResponse> cached = cacheService.get(cacheKey);
             if (cached.isPresent()) {
@@ -134,7 +139,7 @@ public class AnswerService {
                 });
         if (snippets.isEmpty()) {
             // 问答必须基于检索片段：没检索到就明说，而不是把空上下文甩给 LLM
-            return new AnswerResponse(NO_SNIPPETS_ANSWER, List.of(), properties.getModel());
+            return new AnswerResponse(NO_SNIPPETS_ANSWER, List.of(), effective.model());
         }
 
         String userPrompt = buildPrompt(question, snippets, List.of());
@@ -144,15 +149,13 @@ public class AnswerService {
             if (!consumption.allowed()) {
                 throw new RateLimitExceededException(consumption.usedToday(), consumption.dailyLimit());
             }
-            // 按请求解析配置：带用户自填 key 用临时客户端（用完即弃），否则回落服务端默认
-            LlmConfig effective = requestConfig != null && requestConfig.configured()
-                    ? requestConfig : serverDefaultConfig;
+            // 带用户自填 key 用临时客户端（用完即弃），否则回落服务端默认
             String raw = llmClientFactory.create(effective).complete(SYSTEM_PROMPT, userPrompt);
             ParsedAnswer parsed = parse(raw);
             ValidationResult validation = validate(parsed.references(), snippets);
             if (validation.invalid().isEmpty() || attempt == maxAttempts()) {
                 AnswerResponse response = new AnswerResponse(
-                        parsed.answer(), validation.valid(), properties.getModel());
+                        parsed.answer(), validation.valid(), effective.model());
                 if (cacheKey != null) {
                     cacheService.put(cacheKey, response);
                 }
@@ -216,15 +219,21 @@ public class AnswerService {
 
     // ---------- T11：缓存 key 与 token 估算 ----------
 
-    /** commitSha 未知（null/空白）时返回 null —— 调用方据此完全跳过缓存。 */
-    private CacheKey cacheKeyFor(AnalysisTaskSnapshot snapshot, String question, String unitId) {
+    /**
+     * commitSha 未知（null/空白）时返回 null —— 调用方据此完全跳过缓存。
+     *
+     * <p>{@code model} 传**本次请求生效的模型**（而非服务端配置）：不同模型的答案不可互用，
+     * 否则用户自带模型会直接命中服务端模型的缓存条目。
+     */
+    private CacheKey cacheKeyFor(AnalysisTaskSnapshot snapshot, String question, String unitId,
+                                 String model) {
         AnalysisTaskSnapshot.AnalysisOutcome outcome = snapshot.outcome();
         String commitSha = outcome == null ? null : outcome.commitSha();
         if (commitSha == null || commitSha.isBlank()) {
             return null;
         }
         return new CacheKey(commitSha, resolveAnchorFile(outcome, unitId),
-                hashQuestion(question), properties.getModel());
+                hashQuestion(question), model);
     }
 
     private static String resolveAnchorFile(AnalysisTaskSnapshot.AnalysisOutcome outcome, String unitId) {
