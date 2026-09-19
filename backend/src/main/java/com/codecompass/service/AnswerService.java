@@ -50,17 +50,32 @@ public class AnswerService {
             """;
 
     private final CodeRetriever retriever;
-    private final LlmClient llmClient;
+    private final LlmClientFactory llmClientFactory;
+    private final LlmConfig serverDefaultConfig;
     private final LlmProperties properties;
     private final JsonMapper lenientMapper;
     private final CacheService cacheService;
     private final RateLimiter rateLimiter;
 
+    /**
+     * 兼容构造：固定单例客户端（学习路线/测验等不按请求配 key 的场景，以及既有测试）。
+     * 内部把固定客户端包成「忽略 config」的工厂，回落逻辑退化为恒用该客户端。
+     */
     public AnswerService(CodeRetriever retriever, LlmClient llmClient,
                          LlmProperties properties, JsonMapper jsonMapper,
                          CacheService cacheService, RateLimiter rateLimiter) {
+        this(retriever, config -> llmClient,
+                new LlmConfig("default", "openai", "", "", "gpt-4o-mini", true),
+                properties, jsonMapper, cacheService, rateLimiter);
+    }
+
+    /** 主构造：按请求解析配置 —— 带请求头用临时客户端，否则回落服务端默认。 */
+    public AnswerService(CodeRetriever retriever, LlmClientFactory llmClientFactory,
+                         LlmConfig serverDefaultConfig, LlmProperties properties, JsonMapper jsonMapper,
+                         CacheService cacheService, RateLimiter rateLimiter) {
         this.retriever = retriever;
-        this.llmClient = llmClient;
+        this.llmClientFactory = llmClientFactory;
+        this.serverDefaultConfig = serverDefaultConfig;
         this.properties = properties;
         this.cacheService = cacheService;
         this.rateLimiter = rateLimiter;
@@ -72,7 +87,12 @@ public class AnswerService {
 
     public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question,
                               String unitId, String clientKey) {
-        return askCore(snapshot, question, unitId, null, null, clientKey);
+        return ask(snapshot, question, unitId, null, null, clientKey, null);
+    }
+
+    public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question,
+                              String unitId, String clientKey, LlmConfig requestConfig) {
+        return ask(snapshot, question, unitId, null, null, clientKey, requestConfig);
     }
 
     /**
@@ -81,11 +101,19 @@ public class AnswerService {
      */
     public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question, String unitId,
                               Integer anchorStartLine, Integer anchorEndLine, String clientKey) {
-        return askCore(snapshot, question, unitId, anchorStartLine, anchorEndLine, clientKey);
+        return ask(snapshot, question, unitId, anchorStartLine, anchorEndLine, clientKey, null);
+    }
+
+    /** 带本次请求 LLM 配置（用户自填 key）的版本；{@code requestConfig} 为 null 时回落服务端默认。 */
+    public AnswerResponse ask(AnalysisTaskSnapshot snapshot, String question, String unitId,
+                              Integer anchorStartLine, Integer anchorEndLine, String clientKey,
+                              LlmConfig requestConfig) {
+        return askCore(snapshot, question, unitId, anchorStartLine, anchorEndLine, clientKey, requestConfig);
     }
 
     private AnswerResponse askCore(AnalysisTaskSnapshot snapshot, String question, String unitId,
-                                   Integer anchorStartLine, Integer anchorEndLine, String clientKey) {
+                                   Integer anchorStartLine, Integer anchorEndLine, String clientKey,
+                                   LlmConfig requestConfig) {
         CacheKey cacheKey = anchorStartLine == null
                 ? cacheKeyFor(snapshot, question, unitId) : null;
         if (cacheKey != null) {
@@ -116,7 +144,10 @@ public class AnswerService {
             if (!consumption.allowed()) {
                 throw new RateLimitExceededException(consumption.usedToday(), consumption.dailyLimit());
             }
-            String raw = llmClient.complete(SYSTEM_PROMPT, userPrompt);
+            // 按请求解析配置：带用户自填 key 用临时客户端（用完即弃），否则回落服务端默认
+            LlmConfig effective = requestConfig != null && requestConfig.configured()
+                    ? requestConfig : serverDefaultConfig;
+            String raw = llmClientFactory.create(effective).complete(SYSTEM_PROMPT, userPrompt);
             ParsedAnswer parsed = parse(raw);
             ValidationResult validation = validate(parsed.references(), snippets);
             if (validation.invalid().isEmpty() || attempt == maxAttempts()) {

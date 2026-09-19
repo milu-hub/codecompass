@@ -27,6 +27,8 @@ import com.codecompass.service.AnalysisOrchestrator;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
 import com.codecompass.service.ClientIdentityHolder;
+import com.codecompass.service.LlmConfig;
+import com.codecompass.service.LlmConfigService;
 import com.codecompass.service.LlmException;
 import com.codecompass.service.QaHistoryRecorder;
 import com.codecompass.service.RateLimitExceededException;
@@ -61,6 +63,7 @@ public class RepoController {
     private final AnswerService answerService;
     private final AchievementService achievementService;
     private final QaHistoryRecorder qaHistoryRecorder;
+    private final LlmConfigService llmConfigService;
 
     public RepoController(GitRepositoryCloner cloner,
                           AnalysisOrchestrator orchestrator,
@@ -68,7 +71,8 @@ public class RepoController {
                           DependencyGraphBuilder graphBuilder,
                           AnswerService answerService,
                           AchievementService achievementService,
-                          QaHistoryRecorder qaHistoryRecorder) {
+                          QaHistoryRecorder qaHistoryRecorder,
+                          LlmConfigService llmConfigService) {
         this.cloner = cloner;
         this.orchestrator = orchestrator;
         this.store = store;
@@ -76,6 +80,7 @@ public class RepoController {
         this.answerService = answerService;
         this.achievementService = achievementService;
         this.qaHistoryRecorder = qaHistoryRecorder;
+        this.llmConfigService = llmConfigService;
     }
 
     @PostMapping
@@ -202,12 +207,13 @@ public class RepoController {
         }
         try {
             String clientKey = resolveClientKey(servletRequest);
+            LlmConfig requestConfig = resolveRequestLlmConfig(servletRequest);
             AnswerResponse answer;
             if (request.anchorStartLine() != null) {
                 answer = answerService.ask(snapshot, question, unitId,
-                        request.anchorStartLine(), request.anchorEndLine(), clientKey);
+                        request.anchorStartLine(), request.anchorEndLine(), clientKey, requestConfig);
             } else {
-                answer = answerService.ask(snapshot, question, unitId, clientKey);
+                answer = answerService.ask(snapshot, question, unitId, clientKey, requestConfig);
             }
             // T19 触发点：提问成功后计数（TEN_QUESTIONS）。记录失败不打断问答。
             String clientId = ClientIdentityHolder.get();
@@ -245,5 +251,28 @@ public class RepoController {
             return forwarded.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    /**
+     * 从请求头读取用户自填的 LLM 配置（{@code X-LLM-Api-Key} / {@code X-LLM-Base-Url} /
+     * {@code X-LLM-Model}）。三个头都没有 key 时返回 {@code null}（回落服务端默认）；
+     * base-url / model 缺省时用服务端默认补齐。
+     *
+     * <p><b>安全</b>：key 只在此构造临时 {@link LlmConfig}，用完即弃，绝不缓存、绝不落库、
+     * 绝不记日志。
+     */
+    private LlmConfig resolveRequestLlmConfig(HttpServletRequest request) {
+        String apiKey = request.getHeader("X-LLM-Api-Key");
+        if (apiKey == null || apiKey.isBlank()) {
+            return null;
+        }
+        LlmConfig serverDefault = llmConfigService.getDefault();
+        String baseUrl = firstNonBlank(request.getHeader("X-LLM-Base-Url"), serverDefault.baseUrl());
+        String model = firstNonBlank(request.getHeader("X-LLM-Model"), serverDefault.model());
+        return new LlmConfig("request", "custom", baseUrl, apiKey.trim(), model, false);
+    }
+
+    private static String firstNonBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

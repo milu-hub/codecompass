@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -381,5 +382,35 @@ class AnswerServiceTest {
         String taskId = store.create("https://github.com/a/b");
         store.update(taskId, snapshot -> snapshot.withDone(outcome, "java", "分析完成"));
         return store.find(taskId).orElseThrow();
+    }
+
+    @Test
+    @DisplayName("请求头 config 优先：带 requestConfig 用其构造客户端，不带则回落服务端默认")
+    void requestConfigOverridesServerDefault() {
+        LlmClient mockClient = Mockito.mock(LlmClient.class);
+        Mockito.when(mockClient.complete(anyString(), anyString()))
+                .thenReturn("{\"answer\":\"A\",\"references\":[]}");
+
+        AtomicReference<LlmConfig> captured = new AtomicReference<>();
+        LlmClientFactory factory = config -> {
+            captured.set(config);
+            return mockClient;
+        };
+        LlmConfig serverDefault = new LlmConfig("default", "openai",
+                "https://api.openai.com/v1", "", "gpt-4o-mini", true);
+        AnswerService svc = new AnswerService(
+                new LexicalCodeRetriever(new RetrieveProperties()),
+                factory, serverDefault,
+                new LlmProperties(), JsonMapper.builder().build(),
+                cacheService, rateLimiter);
+
+        LlmConfig requestConfig = new LlmConfig("request", "deepseek",
+                "https://api.deepseek.com/v1", "sk-test-key", "deepseek-chat", false);
+
+        svc.ask(doneSnapshot(), "OwnerController", null, "test-client", requestConfig);
+        assertThat(captured.get()).isEqualTo(requestConfig);
+
+        svc.ask(doneSnapshot(), "OwnerController", null, "test-client");
+        assertThat(captured.get()).isEqualTo(serverDefault);
     }
 }

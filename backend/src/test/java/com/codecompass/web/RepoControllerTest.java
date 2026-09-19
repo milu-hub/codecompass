@@ -6,6 +6,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -27,6 +28,9 @@ import com.codecompass.service.CacheProperties;
 import com.codecompass.service.InMemoryCacheService;
 import com.codecompass.service.InMemoryRateLimiter;
 import com.codecompass.service.LlmClient;
+import com.codecompass.service.LlmConfig;
+import com.codecompass.service.LlmConfigService;
+import com.codecompass.service.InMemoryLlmConfigService;
 import com.codecompass.service.LlmException;
 import com.codecompass.service.LlmProperties;
 import com.codecompass.service.RateLimitProperties;
@@ -34,9 +38,11 @@ import com.codecompass.testutil.MutableClock;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -55,6 +61,7 @@ class RepoControllerTest {
     private GitRepositoryCloner cloner;
     private LlmClient llmClient;
     private RateLimitProperties rateLimitProperties;
+    private LlmConfigService llmConfigService;
     private MockMvc mockMvc;
     private String seededTaskId;
 
@@ -71,6 +78,7 @@ class RepoControllerTest {
 
         llmClient = Mockito.mock(LlmClient.class);
         rateLimitProperties = new RateLimitProperties();
+        llmConfigService = new InMemoryLlmConfigService(new LlmProperties());
         AnswerService answerService = new AnswerService(
                 new LexicalCodeRetriever(new RetrieveProperties()),
                 llmClient, new LlmProperties(), JsonMapper.builder().build(),
@@ -85,7 +93,8 @@ class RepoControllerTest {
                         new com.codecompass.graph.MermaidRenderer()),
                 answerService,
                 Mockito.mock(com.codecompass.service.AchievementService.class),
-                Mockito.mock(com.codecompass.service.QaHistoryRecorder.class))).build();
+                Mockito.mock(com.codecompass.service.QaHistoryRecorder.class),
+                llmConfigService)).build();
     }
 
     // ---------- POST /api/repos ----------
@@ -340,7 +349,7 @@ class RepoControllerTest {
     @DisplayName("clientKey 优先取 X-Client-Id 请求头")
     void clientKeyPrefersXClientIdHeader() throws Exception {
         AnswerService answerService = Mockito.mock(AnswerService.class);
-        Mockito.when(answerService.ask(any(), anyString(), any(), anyString()))
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString(), isNull()))
                 .thenReturn(new AnswerResponse("A", List.of(), "gpt-4o-mini"));
         MockMvc custom = controllerWith(answerService);
         String taskId = doneTaskId();
@@ -351,14 +360,14 @@ class RepoControllerTest {
                         .content("{\"question\": \"hi\"}"))
                 .andExpect(status().isOk());
 
-        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("anon-session-42"));
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("anon-session-42"), isNull());
     }
 
     @Test
     @DisplayName("无 X-Client-Id 时回落到 remoteAddr")
     void clientKeyFallsBackToRemoteAddr() throws Exception {
         AnswerService answerService = Mockito.mock(AnswerService.class);
-        Mockito.when(answerService.ask(any(), anyString(), any(), anyString()))
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString(), isNull()))
                 .thenReturn(new AnswerResponse("A", List.of(), "gpt-4o-mini"));
         MockMvc custom = controllerWith(answerService);
         String taskId = doneTaskId();
@@ -368,14 +377,14 @@ class RepoControllerTest {
                         .content("{\"question\": \"hi\"}"))
                 .andExpect(status().isOk());
 
-        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("127.0.0.1"));
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("127.0.0.1"), isNull());
     }
 
     @Test
     @DisplayName("X-Forwarded-For 取第一跳（反代场景）")
     void clientKeyUsesForwardedForFirstHop() throws Exception {
         AnswerService answerService = Mockito.mock(AnswerService.class);
-        Mockito.when(answerService.ask(any(), anyString(), any(), anyString()))
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString(), isNull()))
                 .thenReturn(new AnswerResponse("A", List.of(), "gpt-4o-mini"));
         MockMvc custom = controllerWith(answerService);
         String taskId = doneTaskId();
@@ -386,7 +395,31 @@ class RepoControllerTest {
                         .content("{\"question\": \"hi\"}"))
                 .andExpect(status().isOk());
 
-        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("203.0.113.7"));
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), eq("203.0.113.7"), isNull());
+    }
+
+    @Test
+    @DisplayName("带 X-LLM-Api-Key 请求头 → 用请求头配置构造 requestConfig 传给 AnswerService")
+    void requestHeaderLlmConfigIsPassedThrough() throws Exception {
+        AnswerService answerService = Mockito.mock(AnswerService.class);
+        Mockito.when(answerService.ask(any(), anyString(), any(), anyString(), any(LlmConfig.class)))
+                .thenReturn(new AnswerResponse("A", List.of(), "deepseek-chat"));
+        MockMvc custom = controllerWith(answerService);
+        String taskId = doneTaskId();
+
+        custom.perform(post("/api/repos/" + taskId + "/ask")
+                        .header("X-LLM-Api-Key", "sk-test-abc")
+                        .header("X-LLM-Base-Url", "https://api.deepseek.com/v1")
+                        .header("X-LLM-Model", "deepseek-chat")
+                        .contentType("application/json")
+                        .content("{\"question\": \"hi\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<LlmConfig> captor = ArgumentCaptor.forClass(LlmConfig.class);
+        Mockito.verify(answerService).ask(any(), eq("hi"), any(), any(), captor.capture());
+        assertThat(captor.getValue().apiKey()).isEqualTo("sk-test-abc");
+        assertThat(captor.getValue().baseUrl()).isEqualTo("https://api.deepseek.com/v1");
+        assertThat(captor.getValue().model()).isEqualTo("deepseek-chat");
     }
 
     private MockMvc controllerWith(AnswerService answerService) {
@@ -396,7 +429,8 @@ class RepoControllerTest {
                         new com.codecompass.graph.MermaidRenderer()),
                 answerService,
                 Mockito.mock(com.codecompass.service.AchievementService.class),
-                Mockito.mock(com.codecompass.service.QaHistoryRecorder.class))).build();
+                Mockito.mock(com.codecompass.service.QaHistoryRecorder.class),
+                llmConfigService)).build();
     }
 
     private String doneTaskId() {
