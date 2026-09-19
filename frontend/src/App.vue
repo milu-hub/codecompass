@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import RepositoryView from './views/RepositoryView.vue'
 import AchievementsBadge from './components/AchievementsBadge.vue'
+import SettingsDrawer from './components/SettingsDrawer.vue'
 import { useHealthStore } from './stores/health'
 
 // T0 的健康卡片已完成使命，缩成页脚一行连通性状态
 const health = useHealthStore()
 const { status } = storeToRefs(health)
+
+/** LLM 设置抽屉开合（入口在右上角，与成就徽章并列） */
+const settingsVisible = ref(false)
 
 onMounted(() => {
   void health.load()
@@ -18,10 +22,15 @@ onMounted(() => {
   <header class="app-header cc-glass-bar">
     <div class="app-header-inner">
       <span class="app-title">CodeCompass</span>
-      <!-- F5：成就入口（顶部） -->
-      <AchievementsBadge />
+      <div class="app-header-actions">
+        <!-- F5：成就入口（顶部） -->
+        <AchievementsBadge />
+        <!-- 用户自填 LLM key 的设置入口（与成就徽章并列） -->
+        <el-button size="small" text @click="settingsVisible = true">⚙️ 设置</el-button>
+      </div>
     </div>
   </header>
+  <SettingsDrawer v-model="settingsVisible" />
   <RepositoryView />
   <footer class="app-footer">
     <small>后端连通性：{{ status || '…' }} · CodeCompass MVP</small>
@@ -52,6 +61,13 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 700;
   color: #303133;
+}
+
+/* 右侧动作组：成就徽章 + 设置入口并排 */
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .app-footer {
