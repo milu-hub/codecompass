@@ -93,6 +93,11 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
   - **只允许 https**：会挡住本地 Ollama 与局域网 LLM，明确不采纳。
   - **provider 域名白名单**：维护成本高且会挡住自建反代，明确不采纳。
 
+- **大图的 mermaid 边数上限（第一层，本轮未做）**：mermaid 默认 `maxEdges = 500`，一旦超过就抛
+  `Edge limit exceeded`，前端 `DependencyGraphPane` 会显示「依赖图渲染失败」。本轮只做了归属粒度
+  修正（见决策记录最后一条），把 flask 512→148、click 3497→365 拉回上限内，但**更大的仓库仍可能越限**。
+  尚未做：前端显式设 `maxEdges`，并在超限时给产品化降级提示（引导看邻域）而不是显示"渲染失败"。
+
 ## 决策记录
 - 2026-09-17：确定 MVP 边界，产品目标多语言，首发 Java 解析器
 - 2026-09-17：本机 Redis 被 Device Guard 阻止，MVP 改用内存缓存
@@ -238,3 +243,4 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
 - 用户自填 Key 联调**发现并修复的真 bug**：`AnswerService` 原先用服务端 `LlmProperties.getModel()` 组缓存 key 与响应 `model` 字段 —— 用户自带不同模型时会**命中服务端模型的缓存**（拿到别的模型答的答案、自己配的模型根本没被调用），响应里也报错的模型名。改为统一用**本次请求生效的模型** `effective.model()`。真机复验：自带一个不存在的模型 → 缓存未命中 → 真发请求 → HTTP 400（修复前会直接返回服务端模型的缓存答案）
 - 用户自填 Key **多配置管理**（纯前端，后端零改动）：localStorage 结构升级为 `{activeId, profiles:[{id,name,provider,baseUrl,apiKey,model}]}`，**旧「单套扁平」格式读到即迁移成一条并置为当前**（不让老用户丢配置）。设置抽屉加配置列表（名称 + provider·model·掩码，当前启用带绿色标记与「使用中」文字）+ 新建/编辑/启用/删除；**正在使用的那套拒绝删除**（比"删完自动换一套"更可预测）；顶栏设置按钮旁加配置切换下拉（显示当前配置名，点一下即切，含「管理配置…」入口）。请求头仍只读 activeId 那套，缓存 key 已含 model 故切模型不会错命中
 - **SSRF 决策（用户拍板）**：**采纳**「解析域名后拒绝私有网段 / 环回 / link-local」—— 默认拒绝是安全基线，`codecompass.llm.allow-private-network` 可放开（本地 Ollama / 局域网 LLM 是合法用法），云元数据 `169.254.0.0/16` 硬拒不可配；**额外要求**已落地：禁止跟随重定向（`NoRedirectRequestFactory` 显式 `setInstanceFollowRedirects(false)`，防 302 跳内网）、每次出站前记一行 `host + model`（不记完整 URL、不记 key）。**不采纳**「只允许 https」（挡住本地 Ollama / 局域网 LLM）与「provider 域名白名单」（维护成本高且挡住自建反代）。**DNS rebinding 防护留待后续**，已记入「已知风险」
+- **Python 依赖边归属粒度修正（第二层，用户报「flask 全图渲染失败」后定位）**：根因有两层 —— 表层是 mermaid 默认 `maxEdges=500` 被撑破（见「已知风险」首条下方那条），里层是 `PythonImportResolver` 的**文件级 fan-out**：一条 import 属于整个文件，起点是该文件**全部**单元、终点可能是目标模块**全部**单元，边数被放大成 |文件内单元|×|目标单元|。真机实证：flask 512 条边里，4 个单元各出度 40 且目标集完全相同，光这 4 个就占 160 条（31%）。改为**按名字使用归属**：判据是该单元**行区间内出现过这个 import 绑定的标识符**（AST 的 NAME token，不含注释/字符串），且过滤细到**逐个名字**（`from X import a, b` 只用了 a 就只连 a）。两处**有意保留的粗粒度**：`from X import *` 名字不可知 → 文件粒度；目标侧无"模块"节点 → `import X` 仍落到该模块全部单元。**已知召回损失**：模块级（不属于任何类/函数）的用法无处归属 → 不连边，这是"模块不是单元"的必然代价。**实测**：flask 512→148 边（147 单元不变）、click 3497→365 边（303 单元不变），两者都回到 mermaid 上限内，真机界面「显示全图」正常出图（92 节点/148 边）。**契约变更同步**：`PythonImportResolverTest` 的 fixture 改为真正使用导入名（原来 `class App: pass` 从未用过导入，测的是旧假边）+ 新增 5 条用例钉住新规则；黄金样本 3 的 `user_list` 改为真的用到 `User`（原 fixture 只用硬编码 dict，旧行为给的是假边），行号断言不变。新增单元 5

@@ -158,7 +158,7 @@ class PythonGoldenSampleTest {
                 "",
                 "@api_view([\"GET\"])",
                 "def user_list(request):",
-                "    return Response({\"name\": \"x\"})");
+                "    return Response({\"count\": User.objects.count()})");
 
         AnalyzeResult result = analyze(List.of("myapp/models.py", "myapp/views.py"));
 
@@ -178,7 +178,9 @@ class PythonGoldenSampleTest {
 
         Map<String, String> roles = roleAnnotator.annotate(result);
         assertThat(roles).containsEntry(user.id(), "entity").containsEntry(userList.id(), "controller");
-        // 相对导入 from .models import User → 精确连到 User
+        // 相对导入 from .models import User → 精确连到 User。
+        // 注意 fixture 里 user_list 必须**真的用到** User：按名字使用归属后，
+        // 「导入了但没用」不再产生边（旧的文件级归属会给出一条假边）。
         assertThat(result.dependencies()).extracting(e -> e.fromCodeUnitId() + ">" + e.toCodeUnitId())
                 .containsExactly(userList.id() + ">" + user.id());
     }

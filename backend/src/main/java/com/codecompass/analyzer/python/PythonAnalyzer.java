@@ -54,8 +54,8 @@ public class PythonAnalyzer implements LanguageAnalyzer {
         List<CodeUnitInfo> units = new ArrayList<>();
         List<MethodInfo> methods = new ArrayList<>();
         List<FailedFile> failedFiles = new ArrayList<>();
-        Map<String, List<String>> unitIdsByFile = new HashMap<>();
-        Map<String, List<PythonImportResolver.PythonImport>> importsByFile = new HashMap<>();
+        // 每个文件的扫描结果 = import 描述 + 全文件 NAME 位置（后者用于按单元区间判"用没用"）
+        Map<String, PythonImportResolver.FileScan> scansByFile = new HashMap<>();
 
         for (CodeUnitFileInfo file : request.files()) {
             if (!"python".equals(file.language())) {
@@ -78,11 +78,7 @@ public class PythonAnalyzer implements LanguageAnalyzer {
             units.addAll(extracted.units());
             methods.addAll(extracted.methods());
 
-            List<String> ids = extracted.units().stream().map(CodeUnitInfo::id).toList();
-            if (!ids.isEmpty()) {
-                unitIdsByFile.put(file.relativePath(), ids);
-            }
-            importsByFile.put(file.relativePath(), importResolver.collect(
+            scansByFile.put(file.relativePath(), importResolver.collect(
                     (PythonParser.File_inputContext) outcome.tree(),
                     outcome.tokens(),
                     PythonModuleNames.modulePath(file.relativePath())));
@@ -91,7 +87,7 @@ public class PythonAnalyzer implements LanguageAnalyzer {
         units.sort(Comparator.comparing(CodeUnitInfo::id));
         methods.sort(Comparator.comparing(MethodInfo::id));
         List<DependencyEdge> dependencies =
-                importResolver.resolve(request.repositoryId(), units, unitIdsByFile, importsByFile);
+                importResolver.resolve(request.repositoryId(), units, scansByFile);
         String framework = detectFramework(units);
         return new AnalyzeResult(request.repositoryId(), "python", framework, units, methods, dependencies, failedFiles);
     }
