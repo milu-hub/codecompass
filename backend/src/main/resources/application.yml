@@ -3,7 +3,9 @@ spring:
     name: codecompass-backend
 
   # T13：持久化。连接串从环境变量读（不硬编码）；缺省回落 H2（单元测试/无库开发）。
-  # 集成/生产：DB_URL=jdbc:mysql://127.0.0.1:3306/codecompass?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+  # 集成/生产：DB_URL=jdbc:mysql://127.0.0.1:3306/codecompass?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+  #   allowPublicKeyRetrieval=true 必带：MySQL 8 的 caching_sha2_password 在非 SSL 下首次握手要取服务端公钥，
+  #   缺省 false 会在服务端凭据缓存清空（如 MySQL 重启）后报「Public Key Retrieval is not allowed」。
   datasource:
     url: ${DB_URL:jdbc:h2:mem:codecompass;MODE=MySQL;DB_CLOSE_DELAY=-1}
     username: ${DB_USER:sa}
