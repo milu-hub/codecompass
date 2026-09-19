@@ -41,11 +41,24 @@ public class QuizService {
             不要输出 JSON 之外的任何内容。
             """;
 
-    private final LlmClient llmClient;
+    private final LlmClientFactory llmClientFactory;
+    private final LlmConfig serverDefaultConfig;
     private final JsonMapper lenientMapper;
 
+    /**
+     * 兼容构造：固定单例客户端（既有测试）。内部把固定客户端包成「忽略 config」的工厂，
+     * 回落逻辑退化为恒用该客户端。
+     */
     public QuizService(LlmClient llmClient, JsonMapper jsonMapper) {
-        this.llmClient = llmClient;
+        this(config -> llmClient,
+                new LlmConfig("default", "openai", "", "", "gpt-4o-mini", true),
+                jsonMapper);
+    }
+
+    /** 主构造：按请求解析配置 —— 带请求头用临时客户端，否则回落服务端默认。 */
+    public QuizService(LlmClientFactory llmClientFactory, LlmConfig serverDefaultConfig, JsonMapper jsonMapper) {
+        this.llmClientFactory = llmClientFactory;
+        this.serverDefaultConfig = serverDefaultConfig;
         this.lenientMapper = jsonMapper.rebuild()
                 .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                 .build();
@@ -53,6 +66,13 @@ public class QuizService {
 
     public Quiz generate(AnalyzeResult result, Map<String, List<String>> sourceLines,
                          String repoUrl, String commitSha, List<String> selectedUnitIds) {
+        return generate(result, sourceLines, repoUrl, commitSha, selectedUnitIds, null);
+    }
+
+    /** 带本次请求 LLM 配置（用户自填 key）的版本；{@code requestConfig} 为 null 时回落服务端默认。 */
+    public Quiz generate(AnalyzeResult result, Map<String, List<String>> sourceLines,
+                         String repoUrl, String commitSha, List<String> selectedUnitIds,
+                         LlmConfig requestConfig) {
         List<CodeUnitInfo> selected = result.codeUnits().stream()
                 .filter(unit -> selectedUnitIds != null && selectedUnitIds.contains(unit.id()))
                 .toList();
@@ -60,7 +80,10 @@ public class QuizService {
             throw new IllegalArgumentException("请至少选择一个类");
         }
 
-        String raw = llmClient.complete(SYSTEM_PROMPT, buildPrompt(selected, sourceLines));
+        LlmConfig effective = requestConfig != null && requestConfig.configured()
+                ? requestConfig : serverDefaultConfig;
+        String raw = llmClientFactory.create(effective)
+                .complete(SYSTEM_PROMPT, buildPrompt(selected, sourceLines));
         List<Quiz.Question> questions = parseAndValidate(raw, selected, sourceLines);
         return new Quiz(UUID.randomUUID().toString(), repoUrl, commitSha, questions);
     }

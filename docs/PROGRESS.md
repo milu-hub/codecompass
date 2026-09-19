@@ -279,3 +279,17 @@ T8 后补验（T8 构建的 jar，含邻域参数）：OwnerController 的 `?uni
   脚本走纯 ASCII + PowerShell 5.1（本机没有 pwsh 7，且 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
   非 ASCII 会变成语法错误；执行策略也要 `-ExecutionPolicy Bypass`）。
   **未做（用户未要求）**：把前端产物打进 jar，见「已知风险」最后一条。
+- **测验生成也支持用户自填 key（用户报「现在无法生成测试」→ 修）**：切到无数据库裸跑后，后端不再有
+  `CODESCOMPASS_LLM_API_KEY` 服务端 key，而 `POST /api/repos/{id}/quiz` 只走**服务端默认配置**（`QuizService`
+  持有单例 `LlmClient`），于是测验生成 502「无法生成测试」—— 但同一套浏览器 key 下 `/ask` 却正常（
+  `/ask` 早就按请求头解析配置）。根因是**历史不一致**：T16 的测验先于「用户自填 key」功能，从没跟着改成
+  按请求解析。修法对齐 `/ask`：
+  ① `LlmRequestConfigResolver` 抽成单一来源（`X-LLM-Api-Key`/`X-LLM-Base-Url`/`X-LLM-Model` → `LlmConfig`），
+  `RepoController` 与 `QuizController` 共用，避免复制安全敏感逻辑；
+  ② `QuizService` 从「持有单例客户端」改为「`LlmClientFactory` + 服务端默认配置」，`generate` 加
+  `LlmConfig requestConfig` 重载（请求头 > 服务端默认，`null` 回落），兼容构造保留（旧测试不变）；
+  ③ `QuizController` 注入 `LlmConfigService` 并读 `HttpServletRequest`，把请求头配置透传给 `generate`；
+  ④ 前端 `generateQuiz` 像 `askQuestion` 一样透传 `llmRequestHeaders()`。
+  新增单元 2（QuizService 工厂收到请求配置 + QuizController 请求头透传）。**真机**（无数据库 + 无服务端 key）：
+  不带 key → 502（正是之前的死法）；带真实 DeepSeek key 走请求头 → 200 生成 7 题，reference 落在真实行号。
+  **遗留（未做）**：学习路线 reason 仍走服务端默认（无 key 时回退「确定性描述」，不硬失败），未一并接请求头。

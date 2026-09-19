@@ -18,6 +18,8 @@ import com.codecompass.service.AchievementService;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
 import com.codecompass.service.ClientIdentityHolder;
+import com.codecompass.service.LlmConfig;
+import com.codecompass.service.LlmConfigService;
 import com.codecompass.service.LlmException;
 import com.codecompass.service.Quiz;
 import com.codecompass.service.QuizService;
@@ -25,6 +27,8 @@ import com.codecompass.web.dto.ErrorResponse;
 import com.codecompass.web.dto.NotReadyResponse;
 import com.codecompass.web.dto.QuizGradeView;
 import com.codecompass.web.dto.QuizSubmitRequest;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -38,15 +42,17 @@ public class QuizController {
 
     private final AnalysisTaskStore store;
     private final QuizService service;
+    private final LlmConfigService llmConfigService;
     private final QuizRepository repository;
     private final AchievementService achievementService;
     private final JsonMapper jsonMapper;
 
     public QuizController(AnalysisTaskStore store, QuizService service,
-                          QuizRepository repository, AchievementService achievementService,
-                          JsonMapper jsonMapper) {
+                          LlmConfigService llmConfigService, QuizRepository repository,
+                          AchievementService achievementService, JsonMapper jsonMapper) {
         this.store = store;
         this.service = service;
+        this.llmConfigService = llmConfigService;
         this.repository = repository;
         this.achievementService = achievementService;
         this.jsonMapper = jsonMapper;
@@ -56,7 +62,8 @@ public class QuizController {
     }
 
     @PostMapping("/api/repos/{taskId}/quiz")
-    public ResponseEntity<?> generate(@PathVariable String taskId, @RequestBody GenerateRequest request) {
+    public ResponseEntity<?> generate(@PathVariable String taskId, @RequestBody GenerateRequest request,
+                                      HttpServletRequest servletRequest) {
         AnalysisTaskSnapshot snapshot = store.find(taskId).orElse(null);
         if (snapshot == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("任务不存在"));
@@ -66,9 +73,12 @@ public class QuizController {
                     taskId, snapshot.status(), "分析尚未完成，当前状态：" + snapshot.status()));
         }
         try {
+            LlmConfig requestConfig = LlmRequestConfigResolver.resolve(
+                    servletRequest, llmConfigService.getDefault());
             Quiz quiz = service.generate(snapshot.outcome().result(), snapshot.outcome().sourceLines(),
                     snapshot.url(), snapshot.outcome().commitSha(),
-                    request == null ? List.of() : request.codeUnitIds());
+                    request == null ? List.of() : request.codeUnitIds(),
+                    requestConfig);
             repository.save(new QuizEntity(quiz.id(), quiz.repoUrl(), quiz.commitSha(),
                     write(quiz), Instant.now()));
             return ResponseEntity.ok(quiz);

@@ -196,8 +196,9 @@ export interface QuizGrade {
   accuracy: number
 }
 
+/** 生成测验：与 ask 一致，用户自填的 LLM 配置按请求头带上（否则 DB-less 无服务端 key 时会 502）。 */
 export function generateQuiz(taskId: string, codeUnitIds: string[]): Promise<Quiz> {
-  return postJson<Quiz>(`/api/repos/${taskId}/quiz`, { codeUnitIds })
+  return postJson<Quiz>(`/api/repos/${taskId}/quiz`, { codeUnitIds }, llmRequestHeaders())
 }
 
 export function submitQuiz(

@@ -10,7 +10,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class QuizConfiguration {
 
     @Bean
-    public QuizService quizService(LlmClient llmClient, JsonMapper jsonMapper) {
-        return new QuizService(llmClient, jsonMapper);
+    public QuizService quizService(LlmClientFactory llmClientFactory, LlmConfigService llmConfigService,
+                                   JsonMapper jsonMapper) {
+        return new QuizService(llmClientFactory, llmConfigService.getDefault(), jsonMapper);
     }
 }

@@ -7,6 +7,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -19,10 +20,14 @@ import com.codecompass.persistence.QuizRepository;
 import com.codecompass.service.AnalysisTaskSnapshot;
 import com.codecompass.service.AnalysisTaskStore;
 import com.codecompass.service.LlmClient;
+import com.codecompass.service.LlmConfig;
+import com.codecompass.service.LlmConfigService;
+import com.codecompass.service.Quiz;
 import com.codecompass.service.QuizService;
 
 import tools.jackson.databind.json.JsonMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -38,6 +43,7 @@ class QuizControllerTest {
     private AnalysisTaskStore store;
     private QuizRepository repository;
     private LlmClient llmClient;
+    private LlmConfigService llmConfigService;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -45,9 +51,15 @@ class QuizControllerTest {
         store = new AnalysisTaskStore();
         repository = Mockito.mock(QuizRepository.class);
         llmClient = Mockito.mock(LlmClient.class);
-        QuizService service = new QuizService(llmClient, JsonMapper.builder().build());
-        mockMvc = MockMvcBuilders.standaloneSetup(new QuizController(
-                store, service, repository,
+        llmConfigService = Mockito.mock(LlmConfigService.class);
+        when(llmConfigService.getDefault()).thenReturn(
+                new LlmConfig("default", "deepseek", "https://server.example/v1", "sk-server", "server-model", true));
+        mockMvc = mockMvcWith(new QuizService(llmClient, JsonMapper.builder().build()));
+    }
+
+    private MockMvc mockMvcWith(QuizService service) {
+        return MockMvcBuilders.standaloneSetup(new QuizController(
+                store, service, llmConfigService, repository,
                 Mockito.mock(com.codecompass.service.AchievementService.class),
                 JsonMapper.builder().build())).build();
     }
@@ -106,6 +118,30 @@ class QuizControllerTest {
                 .andExpect(jsonPath("$.questions[0].reference.file").value("src/A.java"));
 
         Mockito.verify(repository).save(any());
+    }
+
+    @Test
+    @DisplayName("带 X-LLM-Api-Key 请求头 → 请求头配置传给 QuizService")
+    void requestHeaderLlmConfigIsPassedThrough() throws Exception {
+        QuizService service = Mockito.mock(QuizService.class);
+        when(service.generate(any(), any(), any(), any(), any(), any(LlmConfig.class)))
+                .thenReturn(new Quiz("quiz-1", "https://github.com/a/b", "sha", List.of()));
+        MockMvc custom = mockMvcWith(service);
+        String taskId = doneTaskId();
+
+        custom.perform(post("/api/repos/" + taskId + "/quiz")
+                        .header("X-LLM-Api-Key", "sk-test-abc")
+                        .header("X-LLM-Base-Url", "https://api.deepseek.com/v1")
+                        .header("X-LLM-Model", "deepseek-chat")
+                        .contentType("application/json")
+                        .content("{\"codeUnitIds\":[\"repo:u\"]}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<LlmConfig> captor = ArgumentCaptor.forClass(LlmConfig.class);
+        Mockito.verify(service).generate(any(), any(), any(), any(), any(), captor.capture());
+        assertThat(captor.getValue().apiKey()).isEqualTo("sk-test-abc");
+        assertThat(captor.getValue().baseUrl()).isEqualTo("https://api.deepseek.com/v1");
+        assertThat(captor.getValue().model()).isEqualTo("deepseek-chat");
     }
 
     @Test

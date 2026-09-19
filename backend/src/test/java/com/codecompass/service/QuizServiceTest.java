@@ -113,6 +113,29 @@ class QuizServiceTest {
     }
 
     @Test
+    @DisplayName("带 requestConfig 时用请求配置构造客户端（factory 收到该配置）")
+    void generateUsesRequestConfigWhenProvided() {
+        LlmConfig[] captured = new LlmConfig[1];
+        LlmClient requestClient = Mockito.mock(LlmClient.class);
+        when(requestClient.complete(anyString(), anyString())).thenReturn(
+                "{\"questions\":[" + questionJson(FILE_A, 1, 1) + "]}");
+        LlmConfig serverDefault = new LlmConfig("default", "deepseek",
+                "https://server.example/v1", "sk-server", "server-model", true);
+        LlmConfig requestConfig = new LlmConfig("request", "custom",
+                "https://req.example/v1", "sk-req", "req-model", false);
+        LlmClientFactory factory = config -> {
+            captured[0] = config;
+            return config == requestConfig ? requestClient : Mockito.mock(LlmClient.class);
+        };
+        QuizService svc = new QuizService(factory, serverDefault, JsonMapper.builder().build());
+
+        Quiz quiz = svc.generate(result(), sourceLines(), "r", "sha", List.of("u-a"), requestConfig);
+
+        assertThat(captured[0]).isEqualTo(requestConfig);
+        assertThat(quiz.questions()).hasSize(1);
+    }
+
+    @Test
     @DisplayName("判分：正确数/总数/正确率")
     void gradeComputesAccuracy() {
         Quiz.Question q1 = new Quiz.Question("q0", "single_choice", "Q1",
