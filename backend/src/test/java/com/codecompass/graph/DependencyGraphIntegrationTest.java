@@ -77,8 +77,9 @@ class DependencyGraphIntegrationTest {
             // 可渲染
             assertThat(graph.mermaid()).startsWith("graph LR").contains("-->");
 
-            // 渲染的文本里不得出现原始 id（含 : / . #，Mermaid 不接受）
-            assertThat(graph.mermaid()).doesNotContain("#").doesNotContain("/");
+            // 渲染的文本里不得出现原始 id 的路径分隔符 "/"（节点 id 已用序号 n0..，label 用简单类名）。
+            // 注：不再断言 doesNotContain("#")——T24 起 classDef 用十六进制颜色（fill:#e3f2fd），# 是合法语法。
+            assertThat(graph.mermaid()).doesNotContain("/");
 
             // 引用完整性
             Set<String> nodeIds = graph.nodes().stream().map(GraphNode::id).collect(Collectors.toSet());
