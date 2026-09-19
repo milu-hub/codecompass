@@ -46,6 +46,11 @@ java -jar backend/target/codecompass-backend-0.0.1-SNAPSHOT.jar
 ### 方式二：连接 MySQL 8
 
 ```bash
+DB_URL=jdbc:mysql://127.0.0.1:3306/codecompass?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+DB_USER=root
+DB_PASSWORD=xxx
+CODESCOMPASS_LLM_API_KEY=sk-xxx
+
 java -jar backend/target/codecompass-backend-0.0.1-SNAPSHOT.jar \
   --codecompass.llm.base-url=https://api.deepseek.com/v1 \
   --codecompass.llm.model=deepseek-chat \
