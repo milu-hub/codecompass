@@ -22,10 +22,10 @@
 
 ## 2. 总体结论（TL;DR）
 
-**七层测试完成，发现 4 个失败测试（3 个根因），均为 T24/P2 引入的潜伏回归，非本次功能引入。**
+**七层测试完成，发现 4 个失败测试（3 个根因），均为 T24/P2 引入的潜伏回归；本次已全部修复，复测 0 失败。**
 
-- 全量自动化：**366 测试（单元 338 + 集成 28），4 失败、2 跳过**（跳过项后带真实 key 补跑，2/2 通过）。
-- 4 个失败集中在**集成测试**，根因已逐一定位并归因到具体提交（见 §10）。
+- 全量自动化（修复后）：**367 测试，0 失败、0 错误、2 跳过** → BUILD SUCCESS（跳过项为 LLM key 依赖，已带真实 key 补跑，2/2 通过）。
+- 4 个失败集中在**集成测试**，根因已逐一定位、归因到具体提交并**逐一修复**（见 §10、§13）。
 - 核心链路（F1 分析、F3 问答、F2 路线、F4 测验、F5 身份/笔记/成就、F6 分享脱敏）**手工实测均正常**。
 - 3 个根因之所以潜伏至今，是因为 `mvn test` 默认排除 `@Tag("integration")` 测试，T24 与 P2 之后未重跑集成套件。
 
@@ -232,13 +232,14 @@ Expecting actual: "graph LR\n  n0[...]...\n  classDef role_controller fill:#e3f2
 
 ## 13. 修复建议清单（按优先级）
 
-| 优先级 | 问题 | 建议 | 涉及文件 |
+| 优先级 | 问题 | 状态 | 说明 / 提交 |
 |---|---|---|---|
-| **P0** | `test`/`tests` 目录排除误伤 Java 包（会静默漏扫真实代码） | 目录排除**按语言隔离**：`excludedDirectoryNames` 只对该语言的源码根命中路径生效，或 Java 源不套用 Python 的 `test` 排除；修正"对 Java 无害"的错误假设 | `SourceFileScanner` |
-| **P0** | `**` 全量检出（稀疏检出优化失效 + 测试断言失效） | 检出范围语言感知：先按 `--filter=tree:0` 取树判断仓库语言，再决定 sparse 模式；或对整仓语言单独处理；并同步修正 `GitRepositoryClonerIntegrationTest` 的预期 | `ScanProperties` / `GitRepositoryCloner` |
-| **P1** | graph 测试 `doesNotContain("#")` 断言过时 | 改为精确断言（不含原始 id 的 `/` 分隔符 + 不含 `:` 冒号），允许合法的 `#` 十六进制色 | `DependencyGraphIntegrationTest` |
-| **P1** | CI 盲区：集成套件默认排除导致回归潜伏 | 合并/发布前至少跑一次 `mvn test -Dsurefire.excludedGroups=`；或将关键集成测试纳入常规流水线 | 构建/CI 配置 |
-| **P2** | 分享页 `<head>` mermaid CDN 阻塞（已在本轮前修复，见 `0d73c5b`） | 已修复，无需再动 | — |
+| **P0** | `test`/`tests` 目录排除误伤 Java 包 | ✅ 已修复 | 目录排除改为按 source 语言隔离（不再 `preVisitDirectory` 全局剪枝）。`80d6eb5` |
+| **P0** | `**` 全量检出（稀疏检出优化失效） | ✅ 已修复（文档+断言） | 多语言下全量检出是安全兜底；更新过时断言并补文档，语言感知按需检出留作未来优化。`877439d` |
+| **P1** | graph 测试 `doesNotContain("#")` 断言过时 | ✅ 已修复 | 去掉 `#`（hex 颜色合法），保留 `/`（原始 id 泄漏标志）。`e369ee2` |
+| **P1** | CI 盲区：集成套件默认排除 | ⬜ 未改 | 建议合并/发布前跑一次 `mvn test -Dsurefire.excludedGroups=` |
+| **P2** | MySQL 连接串缺 `allowPublicKeyRetrieval` | ✅ 已修复 | 修正 `application.yml` 示例连接串注释。`155e69b` |
+| **P2** | 分享页 mermaid CDN 阻塞 | ✅ 早前已修复 | `0d73c5b` |
 
 ---
 
