@@ -1,4 +1,5 @@
 import { getJson, postJson, putJson, delJson } from './http'
+import { llmRequestHeaders } from '../utils/llmConfig'
 
 /**
  * T7 REST API 的 TS 类型，手写镜像后端契约（不引 openapi 生成 —— T0 定下的原则）。
@@ -113,6 +114,10 @@ export interface AskResponse {
 /**
  * unitId 是 §S7「点击某个类提问」的锚点；null 时后端按关键词检索。
  * anchorStartLine/anchorEndLine 是 T14 选中标识符的行锚点（可空）。
+ *
+ * <p>用户自填的 LLM 配置按请求用**请求头**带上（`X-LLM-Api-Key` 等）：未配置时
+ * {@link llmRequestHeaders} 返回空对象，一个头都不发，后端回落服务端默认额度。
+ * 走请求头而不是 URL 参数，避免 key 进代理访问日志。
  */
 export function askQuestion(
   taskId: string,
@@ -121,12 +126,16 @@ export function askQuestion(
   anchorStartLine?: number | null,
   anchorEndLine?: number | null,
 ): Promise<AskResponse> {
-  return postJson<AskResponse>(`/api/repos/${taskId}/ask`, {
-    question,
-    unitId,
-    anchorStartLine: anchorStartLine ?? null,
-    anchorEndLine: anchorEndLine ?? null,
-  })
+  return postJson<AskResponse>(
+    `/api/repos/${taskId}/ask`,
+    {
+      question,
+      unitId,
+      anchorStartLine: anchorStartLine ?? null,
+      anchorEndLine: anchorEndLine ?? null,
+    },
+    llmRequestHeaders(),
+  )
 }
 
 // ---------- F2 学习路线（T14/T15） ----------

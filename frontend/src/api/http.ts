@@ -13,10 +13,22 @@ export async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
+/**
+ * POST JSON。`extraHeaders` 用于按请求附加头部（如问答携带用户自填的 LLM 配置），
+ * 缺省时不额外加任何头。
+ */
+export async function postJson<T>(
+  path: string,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...extraHeaders,
+    },
     body: JSON.stringify(body),
   })
   if (!response.ok) {
