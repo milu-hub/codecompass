@@ -303,6 +303,26 @@ class SourceFileScannerTest {
     }
 
     @Test
+    @DisplayName("P2 目录排除只对整仓语言生效：Java 的 test 包目录不被 Python 的 test 排除误伤")
+    void directoryExclusionDoesNotLeakAcrossLanguages() throws IOException {
+        ScanProperties properties = new ScanProperties();
+        properties.setSources(List.of(javaSource(), pythonSourceSpec()));
+        SourceFileScanner mixed = new SourceFileScanner(properties);
+
+        // Java 的包目录名恰好是 "test"（如 cn.javastack.springboot.test），
+        // Python 的 excludedDirectoryNames 含 "test"，但不能把 Java 的这个包也排除掉。
+        write("src/main/java/cn/example/test/Foo.java");
+        write("tests/test_x.py");
+        write("app/main.py");
+
+        List<CodeUnitFileInfo> found = mixed.scan(repoRoot);
+
+        assertThat(found).extracting(CodeUnitFileInfo::relativePath)
+                .contains("src/main/java/cn/example/test/Foo.java", "app/main.py")
+                .doesNotContain("tests/test_x.py");
+    }
+
+    @Test
     @DisplayName("P2 稀疏检出模式：source-root 为 . 时退化为全量检出 **")
     void wholeRepoSourceRootYieldsFullCheckoutPattern() {
         ScanProperties.SourceSpec python = pythonSourceSpec();

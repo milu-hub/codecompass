@@ -11,8 +11,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,13 +48,6 @@ public class SourceFileScanner {
             return List.of();
         }
 
-        // 目录级排除取所有语言的并集：一次遍历，某语言要排除的目录对其它语言一并跳过
-        // （对 Java 无害——tests/venv 之类本来就不会命中 src/main/java）。
-        Set<String> excludedDirectories = properties.getSources() == null ? Set.of()
-                : properties.getSources().stream()
-                        .flatMap(source -> source.getExcludedDirectoryNames().stream())
-                        .collect(Collectors.toUnmodifiableSet());
-
         List<CodeUnitFileInfo> found = new ArrayList<>();
         try {
             Files.walkFileTree(repositoryRoot, new SimpleFileVisitor<>() {
@@ -64,10 +55,8 @@ public class SourceFileScanner {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                     Path name = dir.getFileName();
-                    if (name != null
-                            && (GIT_DIRECTORY.equals(name.toString())
-                                    || excludedDirectories.contains(name.toString()))) {
-                        // 版本库内部没有源码；被排除的目录（tests/venv/node_modules…）同理
+                    if (name != null && GIT_DIRECTORY.equals(name.toString())) {
+                        // 版本库内部没有源码，不进 .git 翻文件
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;
@@ -107,6 +96,13 @@ public class SourceFileScanner {
         }
 
         for (ScanProperties.SourceSpec source : sources) {
+            // 目录级排除按 source 判断（语言隔离）：命中路径任一目录段则跳过该 source。
+            // 不能放在 preVisitDirectory 里全局剪枝——那会把 Java 包里名为 test 的目录一并排除
+            // （cn.javastack.springboot.test 正是踩中这一点，整包被静默漏扫）。
+            if (source.getExcludedDirectoryNames() != null
+                    && Arrays.stream(segments).anyMatch(source.getExcludedDirectoryNames()::contains)) {
+                continue;
+            }
             String unitName = stripExtension(fileName, source.getFileExtensions());
             if (unitName == null) {
                 continue;
