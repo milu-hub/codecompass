@@ -195,6 +195,28 @@ class GitRepositoryClonerTest {
     }
 
     @Test
+    @DisplayName("多语言（Java + 整仓 Python）时稀疏检出按扩展名派生，绝不退化成 ** 全量")
+    void wholeRepoLanguageYieldsExtensionPatternNotFullCheckout() {
+        ScanProperties.SourceSpec java = new ScanProperties.SourceSpec();
+        java.setLanguage("java");
+        java.setSourceRoot("src/main/java");
+        java.setFileExtensions(List.of(".java"));
+        ScanProperties.SourceSpec python = new ScanProperties.SourceSpec();
+        python.setLanguage("python");
+        python.setSourceRoot(".");
+        python.setFileExtensions(List.of(".py"));
+        ScanProperties multi = new ScanProperties();
+        multi.setSources(List.of(java, python));
+        scan = multi;
+
+        List<List<String>> commands = cloner("git").buildCommands(tempRoot.resolve("ws"), "https://github.com/a/b");
+
+        assertThat(commands.get(2))
+                .contains("**/src/main/java/**", "**/*.py")
+                .doesNotContain("**");
+    }
+
+    @Test
     @DisplayName("受控环境：关闭 git 与凭据管理器的交互提示，否则访问私有仓库会挂住")
     void disablesInteractivePrompts() {
         GitRepositoryCloner cloner = cloner("git");

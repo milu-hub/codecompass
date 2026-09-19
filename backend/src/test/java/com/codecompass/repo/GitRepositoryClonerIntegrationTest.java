@@ -45,9 +45,9 @@ class GitRepositoryClonerIntegrationTest {
         try {
             assertThat(repoDir.resolve("pom.xml")).exists();
             assertThat(repoDir.resolve("src/main/java")).isDirectory();
-            // P2 引入 Python 整仓语言（source-root '.'）后，sparse-checkout 退化为全量检出，
-            // src/test 也会被拉下：多语言产品在克隆完成前无法预知仓库语言，全量是安全兜底。
-            // 原「src/test 被稀疏检出排除」断言在多语言配置下不再成立，故移除。
+            // 稀疏检出按各语言 source-root/扩展名派生：Java 只拉 src/main/java + pom.xml，
+            // 不拉 src/test（整仓 Python 的稀疏模式也按扩展名派生为 **/*.py，不再把每个仓库全量检出）。
+            assertThat(repoDir.resolve("src/test")).doesNotExist();
 
             Path realTempRoot = properties.getTempRoot().toRealPath();
             assertThat(repoDir.toRealPath().startsWith(realTempRoot))

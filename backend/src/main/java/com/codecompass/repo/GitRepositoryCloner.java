@@ -235,7 +235,7 @@ public class GitRepositoryCloner {
         // 源码范围由扫描配置派生，确保"检出什么"与"扫描什么"永远一致
         if (scanProperties.getSources() != null) {
             scanProperties.getSources().stream()
-                    .map(ScanProperties.SourceSpec::sparseCheckoutPattern)
+                    .flatMap(spec -> spec.sparseCheckoutPatterns().stream())
                     .forEach(setPatterns::add);
         }
         commands.add(List.copyOf(setPatterns));

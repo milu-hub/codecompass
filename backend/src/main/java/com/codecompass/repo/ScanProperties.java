@@ -59,15 +59,24 @@ public class ScanProperties {
          * 由 {@link #sourceRoot} 派生而不是各配一份，是为了避免"扫描范围"与"检出范围"漂移 ——
          * 两者一旦不一致，T2 会扫出空集合却不报错。
          *
-         * <p>整仓（{@code source-root: "."}）返回 {@code **}，会把所有路径都检出来。多语言配置下
-         * 只要声明了整仓语言，克隆器就会对**每个仓库**全量检出（克隆完成前无法预知仓库语言，全量是
-         * 安全兜底）；代价是稀疏检出优化失效。语言感知的按需检出留作未来优化。
+         * <p>整仓（{@code source-root: "."}）没有统一源码根，但扫描只按 {@link #fileExtensions}
+         * 挑文件，故稀疏检出也按扩展名派生（Python 的 .py 会派生为"任意深度下所有 .py 文件"的模式），
+         * 而不是全量检出。否则多语言配置下，任何仓库（哪怕纯 Java）都会被强制全量检出，
+         * 大仓库会撞上 60s 克隆超时（实测 spring-petclinic-microservices 全量检出 > 60s）。
+         * 未声明扩展名的整仓语言退回全量（安全兜底）。
+         *
+         * @return 一条或多条 gitignore 风格模式（非 cone 模式），交给 sparse-checkout set。
          */
-        public String sparseCheckoutPattern() {
+        public List<String> sparseCheckoutPatterns() {
             if (isWholeRepo()) {
-                return "**";
+                if (fileExtensions == null || fileExtensions.isEmpty()) {
+                    return List.of("**");
+                }
+                return fileExtensions.stream()
+                        .map(extension -> "**/*" + extension)
+                        .toList();
             }
-            return "**/" + sourceRoot + "/**";
+            return List.of("**/" + sourceRoot + "/**");
         }
 
         /** source-root 为 "." 表示整仓（P2：Python 没有统一源码根约定）。 */

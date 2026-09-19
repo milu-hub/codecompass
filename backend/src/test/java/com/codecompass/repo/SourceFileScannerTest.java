@@ -323,12 +323,12 @@ class SourceFileScannerTest {
     }
 
     @Test
-    @DisplayName("P2 稀疏检出模式：source-root 为 . 时退化为全量检出 **")
-    void wholeRepoSourceRootYieldsFullCheckoutPattern() {
+    @DisplayName("稀疏检出模式：整仓 source-root 按扩展名派生（**/*.py），不是 ** 全量")
+    void wholeRepoSourceRootYieldsExtensionPattern() {
         ScanProperties.SourceSpec python = pythonSourceSpec();
 
-        assertThat(python.sparseCheckoutPattern()).isEqualTo("**");
-        assertThat(javaSource().sparseCheckoutPattern()).isEqualTo("**/src/main/java/**");
+        assertThat(python.sparseCheckoutPatterns()).containsExactly("**/*.py");
+        assertThat(javaSource().sparseCheckoutPatterns()).containsExactly("**/src/main/java/**");
     }
 
     private ScanProperties.SourceSpec pythonSourceSpec() {
