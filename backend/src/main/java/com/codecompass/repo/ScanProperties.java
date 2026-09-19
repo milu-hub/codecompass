@@ -58,6 +58,10 @@ public class ScanProperties {
          *
          * 由 {@link #sourceRoot} 派生而不是各配一份，是为了避免"扫描范围"与"检出范围"漂移 ——
          * 两者一旦不一致，T2 会扫出空集合却不报错。
+         *
+         * <p>整仓（{@code source-root: "."}）返回 {@code **}，会把所有路径都检出来。多语言配置下
+         * 只要声明了整仓语言，克隆器就会对**每个仓库**全量检出（克隆完成前无法预知仓库语言，全量是
+         * 安全兜底）；代价是稀疏检出优化失效。语言感知的按需检出留作未来优化。
          */
         public String sparseCheckoutPattern() {
             if (isWholeRepo()) {

@@ -34,7 +34,7 @@ class GitRepositoryClonerIntegrationTest {
     private CloneProperties properties;
 
     @Test
-    @DisplayName("真实克隆 spring-petclinic：pom.xml 在、src/test 被稀疏检出排除、工作区在临时根下")
+    @DisplayName("真实克隆 spring-petclinic：pom.xml 在、src/main/java 在、工作区在临时根下")
     void clonesSpringPetclinic() throws IOException {
         CloneResult result = cloner.clone(PETCLINIC);
         assertThat(result.success())
@@ -45,9 +45,9 @@ class GitRepositoryClonerIntegrationTest {
         try {
             assertThat(repoDir.resolve("pom.xml")).exists();
             assertThat(repoDir.resolve("src/main/java")).isDirectory();
-            assertThat(repoDir.resolve("src/test"))
-                    .as("稀疏检出模式不含 src/test，它不该被拉到本地")
-                    .doesNotExist();
+            // P2 引入 Python 整仓语言（source-root '.'）后，sparse-checkout 退化为全量检出，
+            // src/test 也会被拉下：多语言产品在克隆完成前无法预知仓库语言，全量是安全兜底。
+            // 原「src/test 被稀疏检出排除」断言在多语言配置下不再成立，故移除。
 
             Path realTempRoot = properties.getTempRoot().toRealPath();
             assertThat(repoDir.toRealPath().startsWith(realTempRoot))
